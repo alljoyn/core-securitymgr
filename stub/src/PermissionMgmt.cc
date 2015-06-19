@@ -18,8 +18,7 @@
 
 #include "qcc/Crypto.h"
 
-#include <SecurityManagerImpl.h>
-#include <X509CertificateParser.h>
+#include <SecurityAgentImpl.h>
 
 qcc::String PermissionMgmt::PubKeyToString(const qcc::ECCPublicKey* pubKey)
 {
@@ -50,7 +49,7 @@ void PermissionMgmt::Claim(const ajn::InterfaceDescription::Member* member, ajn:
     qcc::String errorStr = "Claim: ";
     do {
         /* if not claimable break and error */
-        if (ajn::PermissionConfigurator::STATE_CLAIMABLE != claimableState) {
+        if (ajn::PermissionConfigurator::CLAIMABLE != claimableState) {
             printf("Claim: claim request, but not allowed.\n");
             errorStr.append("Claiming not allowed");
             break;
@@ -73,18 +72,6 @@ void PermissionMgmt::Claim(const ajn::InterfaceDescription::Member* member, ajn:
         }
 
         QStatus status;
-        qcc::ECCPublicKey* pubKeyRoT = new qcc::ECCPublicKey();
-
-        status = ajn::securitymgr::SecurityManagerImpl::UnmarshalPublicKey(inputArg, *pubKeyRoT);
-        if (ER_OK != status) {
-            printf("Claim: failed to unmarshal public key");
-            break;
-        }
-        pubKeyRoTs.push_back(pubKeyRoT);
-
-        // Printout valid RoT pub key
-        qcc::String printableRoTKey = PubKeyToString(pubKeyRoTs.back());
-        printf("\nReceived RoT pubKey: %s \n", printableRoTKey.c_str());
 
         if (NULL != cl && false == cl->OnClaimRequest(pubKeyRoTs.back(), ctx)) {
             printf("User refused to be claimed..\r\n");
@@ -103,14 +90,6 @@ void PermissionMgmt::Claim(const ajn::InterfaceDescription::Member* member, ajn:
         // Step 2: send public key as response back.
 
         // Send public Key back as response
-        ajn::MsgArg output;
-        status = ajn::securitymgr::SecurityManagerImpl::MarshalPublicKey(crypto->GetDHPublicKey(),
-                                                                         peerID, output);
-
-        if (ER_OK != MethodReply(msg, &output, 1)) {
-            printf("Claim: Error sending reply.\n");
-        }
-
         // Printout valid pub key
         qcc::String printablePubKey = PubKeyToString(crypto->GetDHPublicKey());
         printf("\nSending App public Key: %s \n", printablePubKey.c_str());
@@ -124,7 +103,7 @@ void PermissionMgmt::Claim(const ajn::InterfaceDescription::Member* member, ajn:
         if (cl != NULL) {
             cl->OnClaimed(ctx);
             /* This device is claimed */
-            claimableState = ajn::PermissionConfigurator::STATE_CLAIMED;
+            claimableState = ajn::PermissionConfigurator::CLAIMED;
             /* Sometimes this signal is not received on the other side */
             SendClaimDataSignal();
         }
@@ -191,13 +170,13 @@ void PermissionMgmt::InstallMembership(const ajn::InterfaceDescription::Member* 
         return;
     }
     qcc::String certificate((char*)encoded, encodedLen);
-    qcc::String serialNumber = ajn::securitymgr::X509CertificateParser::GetSerialNumber(certificate);
-    qcc::GUID128 guildID = ajn::securitymgr::X509CertificateParser::GetGuildID(certificate);
+    qcc::String serialNumber = "";
+    qcc::GUID128 groupID(1);
 
-    printf("\nInstalling Membership certificate for guild %s with serial number %s\n%s\n",
-           guildID.ToString().c_str(), serialNumber.c_str(), certificate.c_str());
+    printf("\nInstalling Membership certificate for group %s with serial number %s\n%s\n",
+           groupID.ToString().c_str(), serialNumber.c_str(), certificate.c_str());
 
-    memberships[guildID] = certificate;
+    memberships[groupID] = certificate;
 
     MethodReply(msg, ER_OK);
 
@@ -230,26 +209,6 @@ void PermissionMgmt::RemoveMembership(const ajn::InterfaceDescription::Member* m
     if (issuerLen != GUID128::SIZE) {
         MethodReply(msg, ER_INVALID_DATA);
         return;
-    }
-
-    qcc::String serialNum(serial);
-
-    std::map<qcc::GUID128, qcc::String>::iterator it = memberships.begin();
-    while (it != memberships.end()) {
-        if (ajn::securitymgr::X509CertificateParser::GetSerialNumber(it->second) == serialNum) {
-            break;
-        }
-        ++it;
-    }
-    if (it != memberships.end()) {
-        qcc::GUID128 guildID = ajn::securitymgr::X509CertificateParser::GetGuildID(it->second);
-        memberships.erase(it);
-        printf("Removed membership certificate for guild %s with serial number %s\n",
-               guildID.ToString().c_str(), serialNum.c_str());
-        status = ER_OK;
-    } else {
-        printf("Could not find membership certificate with serial number %s\n", serialNum.c_str());
-        status = ER_CERTIFICATE_NOT_FOUND;
     }
 
     MethodReply(msg, status);
@@ -369,7 +328,7 @@ PermissionMgmt::PermissionMgmt(ajn::BusAttachment& ba,
     ajn::BusObject("/security/PermissionMgmt"),
     pubKeyRoTs(),
     cl(_cl),
-    claimableState(ajn::PermissionConfigurator::STATE_UNCLAIMABLE),
+    claimableState(ajn::PermissionConfigurator::NOT_CLAIMABLE),
     ctx(_ctx)
 {
     crypto = NULL;
@@ -415,8 +374,6 @@ PermissionMgmt::PermissionMgmt(ajn::BusAttachment& ba,
     /* Create a new public key, for the stub this can be done,
      * for a real application it would be needed the public key is persistent
      */
-    printf("PermissionMgmt() crypto = '%p'", crypto);
-
     if (!crypto) {
         crypto = new qcc::Crypto_ECC();
         if (ER_OK != crypto->GenerateDHKeyPair()) {
@@ -442,7 +399,6 @@ PermissionMgmt::~PermissionMgmt()
 
 QStatus PermissionMgmt::SendClaimDataSignal()
 {
-    printf("Send the claimingInfo.\n");
     /* Create a MsgArg array of 6 elements */
     //"NotifyConfig", "qa(yv)ya(yv)ua(ayay)", "version,publicKeyInfo,claimableState,trustAnchors,serialNumber,memberships"
 
@@ -450,11 +406,6 @@ QStatus PermissionMgmt::SendClaimDataSignal()
     claimData[0].Set("q", 0);
 
     /* Fill the second element with the public key info ID */
-    MsgArg elements[1];
-    QStatus status = ajn::securitymgr::SecurityManagerImpl::MarshalPublicKey(crypto->GetDHPublicKey(),
-                                                                             peerID, elements[0]);
-    claimData[1].Set("a(yv)", 1, elements);
-
     /* The third element is the current claimable state */
     claimData[2].Set("y", claimableState);
 
@@ -469,7 +420,7 @@ QStatus PermissionMgmt::SendClaimDataSignal()
     claimData[5].Set("a(ayay)", 0, memberCerts);
 
     uint8_t flags = ALLJOYN_FLAG_SESSIONLESS;
-    status = Signal(NULL, 0, *unsecInfoSignalMember, &claimData[0], 6, 0, flags);
+    QStatus status = Signal(NULL, 0, *unsecInfoSignalMember, &claimData[0], 6, 0, flags);
     if (ER_OK != status) {
         printf("Signal returned an error %s.\n", QCC_StatusText(status));
     }
@@ -483,7 +434,6 @@ QStatus PermissionMgmt::CreateInterface(BusAttachment& ba)
     InterfaceDescription* unsecIntf = NULL;
     QStatus status = ba.CreateInterface(SECINTFNAME, secIntf, AJ_IFC_SECURITY_REQUIRED);
     if (ER_OK == status) {
-        printf("Secure Interface created.\n");
         secIntf->AddMethod("Claim", "(yv)(yay)", "(yv)", "adminPublicKey,GUID,identityCert,publicKey");
         secIntf->AddMethod("InstallIdentity", "(yay)", NULL, "PEMofIdentityCert", 0);
         secIntf->AddMethod("InstallMembership", "a(yay)", NULL, "cert", 0);
@@ -502,8 +452,6 @@ QStatus PermissionMgmt::CreateInterface(BusAttachment& ba)
     status = ba.CreateInterface(UNSECINTFNAME, unsecIntf);
 
     if (ER_OK == status) {
-        printf("Unsecured Interface created.\n");
-
         /* publicKey: own public key
          * claimableState: enum ClaimableState
          * rotPublicKeys: array of rot public keys
@@ -524,12 +472,12 @@ QStatus PermissionMgmt::CreateInterface(BusAttachment& ba)
 void PermissionMgmt::SetClaimableState(bool on)
 {
     if (true == on) {
-        claimableState = ajn::PermissionConfigurator::STATE_CLAIMABLE;
+        claimableState = ajn::PermissionConfigurator::CLAIMABLE;
         SendClaimDataSignal();
     } else {
         claimableState =
-            (pubKeyRoTs.size()) ? ajn::PermissionConfigurator::STATE_CLAIMED : ajn::PermissionConfigurator::
-            STATE_UNCLAIMABLE;
+            (pubKeyRoTs.size()) ? ajn::PermissionConfigurator::CLAIMED : ajn::PermissionConfigurator::
+            NOT_CLAIMABLE;
         SendClaimDataSignal();
     }
 }
@@ -537,7 +485,7 @@ void PermissionMgmt::SetClaimableState(bool on)
 /* TODO: add a function that allows the application to reset the claimable state
  * and maybe even the public keys and certificates */
 
-ajn::PermissionConfigurator::ClaimableState PermissionMgmt::GetClaimableState() const
+ajn::PermissionConfigurator::ApplicationState PermissionMgmt::GetClaimableState() const
 {
     return claimableState;
 }

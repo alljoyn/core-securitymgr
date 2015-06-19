@@ -38,22 +38,23 @@ TEST_F(ResetCoreTests, SuccessfulReset) {
     TestClaimListener tcl(claimAnswer);
 
     stub = new Stub(&tcl);
-    ASSERT_TRUE(WaitForState(PermissionConfigurator::STATE_CLAIMABLE, STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(PermissionConfigurator::CLAIMABLE, STATE_RUNNING));
 
     IdentityInfo idInfo;
     idInfo.guid = GUID128();
     idInfo.name = "TestIdentity";
-    ASSERT_EQ(secMgr->StoreIdentity(idInfo), ER_OK);
+    ASSERT_EQ(storage->StoreIdentity(idInfo), ER_OK);
 
     ASSERT_EQ(ER_OK, secMgr->Claim(lastAppInfo, idInfo));
-    ASSERT_TRUE(WaitForState(PermissionConfigurator::STATE_CLAIMED, STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(PermissionConfigurator::CLAIMED, STATE_RUNNING));
 
     stub->SetDSASecurity(true);
 
-    ASSERT_EQ(ER_OK, secMgr->Reset(lastAppInfo));
-    ASSERT_TRUE(WaitForState(PermissionConfigurator::STATE_CLAIMABLE, STATE_RUNNING));
+    ASSERT_EQ(ER_OK, storage->RemoveApplication(lastAppInfo));
+    // ASSERT_TRUE(WaitForState(PermissionConfigurator::CLAIMABLE, STATE_RUNNING, true));
+    ASSERT_TRUE(WaitForState(PermissionConfigurator::CLAIMABLE, STATE_RUNNING, false));
 
-    ApplicationInfo checkUpdatesPendingInfo;
+    OnlineApplication checkUpdatesPendingInfo;
     checkUpdatesPendingInfo.publicKey = lastAppInfo.publicKey;
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
@@ -61,10 +62,10 @@ TEST_F(ResetCoreTests, SuccessfulReset) {
     stub->SetDSASecurity(false);
 
     ASSERT_EQ(ER_OK, secMgr->Claim(lastAppInfo, idInfo));
-    ASSERT_TRUE(WaitForState(PermissionConfigurator::STATE_CLAIMED, STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(PermissionConfigurator::CLAIMED, STATE_RUNNING));
 
     delete stub;
     stub = NULL;
-    ASSERT_TRUE(WaitForState(PermissionConfigurator::STATE_CLAIMED, STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(PermissionConfigurator::CLAIMED, STATE_NOT_RUNNING));
 }
 } // namespace

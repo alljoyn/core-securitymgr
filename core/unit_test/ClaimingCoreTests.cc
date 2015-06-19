@@ -23,13 +23,11 @@ using namespace ajn::securitymgr;
 
 class AutoRejector :
     public ManifestListener {
-    bool ApproveManifest(const ApplicationInfo& appInfo,
-                         const PermissionPolicy::Rule* manifestRules,
-                         const size_t manifestRulesCount)
+    bool ApproveManifest(const OnlineApplication& app,
+                         const Manifest& manifest)
     {
-        QCC_UNUSED(appInfo);
-        QCC_UNUSED(manifestRules);
-        QCC_UNUSED(manifestRulesCount);
+        QCC_UNUSED(app);
+        QCC_UNUSED(manifest);
 
         return false;
     }
@@ -58,30 +56,22 @@ TEST_F(ClaimingCoreTests, SuccessfulClaim) {
     stub = new Stub(&tcl);
 
     /* Wait for signals */
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
 
     /* Create identity */
     IdentityInfo idInfo;
     idInfo.guid = GUID128("abcdef123456789");
     idInfo.name = "TestIdentity";
-    ASSERT_EQ(secMgr->StoreIdentity(idInfo), ER_OK);
-
-    /* Check root of trust */
-    ASSERT_EQ((size_t)0, lastAppInfo.rootsOfTrust.size());
+    ASSERT_EQ(storage->StoreIdentity(idInfo), ER_OK);
 
     /* Claim application */
     ASSERT_EQ(ER_OK, secMgr->Claim(lastAppInfo, idInfo));
 
     /* Check security signal */
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING));
-
-    /* Check root of trust */
-    ASSERT_EQ((size_t)3, lastAppInfo.rootsOfTrust.size());
-    ECCPublicKey secMgrPubKey = secMgr->GetPublicKey();
-    ASSERT_TRUE(secMgrPubKey == lastAppInfo.rootsOfTrust[0]);
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING));
 
     /* Try to claim again */
-    ASSERT_EQ(ER_PERMISSION_DENIED, secMgr->Claim(lastAppInfo, idInfo));
+    ASSERT_NE(ER_OK, secMgr->Claim(lastAppInfo, idInfo));
 
     /* Clear the keystore of the stub */
     stub->Reset();
@@ -90,7 +80,7 @@ TEST_F(ClaimingCoreTests, SuccessfulClaim) {
     delete stub;
     stub = NULL;
 
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 }
 
 /**
@@ -106,12 +96,12 @@ TEST_F(ClaimingCoreTests, RejectManifest) {
     TestClaimListener tcl(claimAnswer);
     Stub stub(&tcl);
 
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
 
     IdentityInfo idInfo;
     idInfo.guid = GUID128();
     idInfo.name = "TestIdentity";
-    ASSERT_EQ(secMgr->StoreIdentity(idInfo), ER_OK);
+    ASSERT_EQ(storage->StoreIdentity(idInfo), ER_OK);
 
     AutoRejector ar;
     secMgr->SetManifestListener(&ar);
@@ -123,36 +113,60 @@ TEST_F(ClaimingCoreTests, RejectManifest) {
 /**
  * \test Set the user defined name of an application and check whether it can be retrieved.
  *       -# Claim the remote application.
- *       -# Set a user defined name.
- *       -# Retrieve the application info from the security manager.
- *       -# Check whether the retrieved user defined name matches the one that was set.
+ *       -# Set meta data
+ *       -# Retrieve the application from the security manager.
+ *       -# Check whether the retrieved meta data matches the one that was set.
  * */
-
-TEST_F(ClaimingCoreTests, SetApplicationName) {
+TEST_F(ClaimingCoreTests, SetMetaData) {
     bool claimAnswer = true;
     TestClaimListener tcl(claimAnswer);
     Stub stub(&tcl);
 
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
 
     IdentityInfo idInfo;
     idInfo.guid = GUID128();
     idInfo.name = "TestIdentity";
-    ASSERT_EQ(secMgr->StoreIdentity(idInfo), ER_OK);
+    ASSERT_EQ(storage->StoreIdentity(idInfo), ER_OK);
 
-    ASSERT_EQ(ER_END_OF_DATA, secMgr->SetApplicationName(lastAppInfo));
+    ApplicationMetaData appMetaData;
+    ASSERT_EQ(ER_END_OF_DATA, storage->SetAppMetaData(lastAppInfo, appMetaData));
+    ASSERT_EQ(ER_END_OF_DATA, storage->GetAppMetaData(lastAppInfo, appMetaData));
 
     ASSERT_EQ(ER_OK, secMgr->Claim(lastAppInfo, idInfo));
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING));
 
     qcc::String userDefinedName = "User-defined test name";
-    lastAppInfo.userDefinedName = userDefinedName;
-    ASSERT_EQ(ER_OK, secMgr->SetApplicationName(lastAppInfo));
+    qcc::String deviceName = "Device test name";
+    qcc::String appName = "Application test name";
 
-    ApplicationInfo appInfo;
-    appInfo.busName = lastAppInfo.busName;
-    ASSERT_EQ(ER_OK, secMgr->GetApplication(appInfo));
-    printf("udn = %s\n", appInfo.userDefinedName.c_str());
-    ASSERT_TRUE(appInfo.userDefinedName == userDefinedName);
+    appMetaData.userDefinedName  = userDefinedName;
+    appMetaData.deviceName  = deviceName;
+    appMetaData.appName  = appName;
+
+    ASSERT_EQ(ER_OK, storage->SetAppMetaData(lastAppInfo, appMetaData));
+
+    OnlineApplication app;
+    app.busName = lastAppInfo.busName;
+    ASSERT_EQ(ER_END_OF_DATA, secMgr->GetApplication(app));
+    app.publicKey = lastAppInfo.publicKey;
+    ASSERT_EQ(ER_OK, secMgr->GetApplication(app));
+    Application mAppInfo;
+    mAppInfo.publicKey = lastAppInfo.publicKey;
+    ASSERT_EQ(ER_OK, storage->GetManagedApplication(mAppInfo));
+
+    appMetaData.userDefinedName = "";
+    appMetaData.deviceName = "";
+    appMetaData.appName = "";
+
+    ASSERT_EQ(ER_OK, storage->GetAppMetaData(mAppInfo, appMetaData));
+    ASSERT_TRUE(userDefinedName == appMetaData.userDefinedName);
+    ASSERT_TRUE(deviceName == appMetaData.deviceName);
+    ASSERT_TRUE(appName == appMetaData.appName);
+
+    ApplicationMetaData emptyAppMetaData;
+    ASSERT_EQ(ER_OK, storage->SetAppMetaData(mAppInfo, emptyAppMetaData));
+    ASSERT_EQ(ER_OK, storage->GetAppMetaData(mAppInfo, appMetaData));
+    ASSERT_TRUE(appMetaData == emptyAppMetaData);
 }
 } // namespace

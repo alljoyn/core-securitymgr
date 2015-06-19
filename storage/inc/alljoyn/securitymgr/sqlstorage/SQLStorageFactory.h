@@ -14,17 +14,21 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef STORAGEFACTORY_H_
-#define STORAGEFACTORY_H_
+#ifndef ALLJOYN_SECMGR_STORAGE_STORAGEFACTORY_H_
+#define ALLJOYN_SECMGR_STORAGE_STORAGEFACTORY_H_
 
 /**
- * \class NativeStorageFactory
- * \brief We need a NativeStorageFactory because at run-time we are not sure which class (derived from Storage) we'll be using
- *        Every implementation needs to provided their own implementation of this class.
+ * \class SQLStorageFactory
+ * \brief We need a SQLStorageFactory because at run-time we are not sure which class (derived from Storage) we'll be using.
+ *        Every implementation needs to provide their own implementation of this class.
  *
  */
 
-#include <alljoyn/securitymgr/Storage.h>
+#include <alljoyn/securitymgr/sqlstorage/UIStorage.h>
+#include <alljoyn/securitymgr/CaStorage.h>
+
+#include <memory>
+#include <string>
 
 namespace ajn {
 namespace securitymgr {
@@ -38,7 +42,7 @@ class SQLStorageFactory {
     /**
      * \brief Get a singleton instance of the storage factory.
      *
-     * \retval NativeStorageFactory reference to the singleton storage factory.
+     * \retval SQLStorageFactory reference to the singleton storage factory.
      */
     static SQLStorageFactory& GetInstance()
     {
@@ -46,13 +50,10 @@ class SQLStorageFactory {
         return sf;
     }
 
-    /* \brief Get a storage instance.
-     *
-     * \retval Storage a pointer to a storage instance. Native Storage by default.
-     * \retval NULL otherwise
-     */
-    Storage* GetStorage();
+    QStatus GetStorages(std::string caName,
+                        shared_ptr<CaStorage>& caStorage,
+                        shared_ptr<UIStorage>& storage);
 };
 }
 }
-#endif
+#endif /* ALLJOYN_SECMGR_STORAGE_STORAGEFACTORY_H_ */

@@ -17,8 +17,8 @@
 #include "Common.h"
 
 JavaVM* Common::jvm = NULL;
-jclass Common::applicationInfoClass = NULL;
-jmethodID Common::appInfoConstructorMID = NULL;
+jclass Common::appClass = NULL;
+jmethodID Common::appConstructorMID = NULL;
 jfieldID Common::infoAppNameFID = NULL;
 jfieldID Common::infoDevNameFID = NULL;
 jfieldID Common::infoFriendlyNameFID = NULL;
@@ -34,7 +34,7 @@ jclass Common::memberClass = NULL;
 jmethodID Common::memberConstructorMID = NULL;
 Storage* Common::storage = NULL;
 
-#define QCC_MODULE "SEC_MGR"
+#define QCC_MODULE "SEGMGR_AGENT"
 
 int Common::SetStringField(JNIEnv* env, jobject object, jfieldID id, qcc::String string)
 {
@@ -119,7 +119,7 @@ void Common::Throw(JNIEnv* env, const char* name, const char* msg)
 
 void Common::initCommon(JNIEnv* env,
                         jclass securityMgrClass,
-                        jclass appInfoClass,
+                        jclass appClass,
                         jclass localRuleClass,
                         jclass localMemberClass)
 {
@@ -131,31 +131,31 @@ void Common::initCommon(JNIEnv* env,
         return;
     }
 
-    applicationInfoClass = (jclass)env->NewGlobalRef(appInfoClass);
-    if (applicationInfoClass == NULL) {
+    appClass = (jclass)env->NewGlobalRef(appClass);
+    if (appClass == NULL) {
         return; //exception will be pending.
     }
-    appInfoConstructorMID = env->GetMethodID(appInfoClass, CONSTRUCTOR_METHOD_NAME, "(II)V");
+    appConstructorMID = env->GetMethodID(appInfoClass, CONSTRUCTOR_METHOD_NAME, "(II)V");
     if (env->ExceptionCheck()) {
         return; //call failed, exception is pending
     }
-    infoAppIdFID = env->GetFieldID(appInfoClass, "applicationId", STRING_CLASS);
+    infoAppIdFID = env->GetFieldID(appClass, "applicationId", STRING_CLASS);
     if (env->ExceptionCheck()) {
         return; //call failed, exception is pending
     }
-    infoFriendlyNameFID = env->GetFieldID(appInfoClass, "userFriendlyName", STRING_CLASS);
+    infoFriendlyNameFID = env->GetFieldID(appClass, "userFriendlyName", STRING_CLASS);
     if (env->ExceptionCheck()) {
         return; //call failed, exception is pending
     }
-    infoDevNameFID = env->GetFieldID(appInfoClass, "deviceName", STRING_CLASS);
+    infoDevNameFID = env->GetFieldID(appClass, "deviceName", STRING_CLASS);
     if (env->ExceptionCheck()) {
         return; //call failed, exception is pending
     }
-    infoAppNameFID = env->GetFieldID(appInfoClass, "applicationName", STRING_CLASS);
+    infoAppNameFID = env->GetFieldID(appClass, "applicationName", STRING_CLASS);
     if (env->ExceptionCheck()) {
         return; //call failed, exception is pending
     }
-    infoPubKeyFID = env->GetFieldID(appInfoClass, "publicKey", "[B");
+    infoPubKeyFID = env->GetFieldID(appClass, "publicKey", "[B");
     if (env->ExceptionCheck()) {
         return; //call failed, exception is pending
     }
@@ -202,25 +202,25 @@ void Common::initCommon(JNIEnv* env,
                                             "(" STRING_CLASS  "II)V");
 }
 
-jobject Common::ToApplicationInfoObject(JNIEnv* env, const ApplicationInfo& info)
+jobject Common::ToApplicationObject(JNIEnv* env, const ApplicationInfo& info)
 {
-    jobject appInfo = env->NewObject(applicationInfoClass,
-                                     appInfoConstructorMID,
-                                     (jint)info.runningState,
-                                     (jint)info.claimState);
-    if (appInfo == NULL) {
+    jobject app = env->NewObject(appClass,
+                                 appConstructorMID,
+                                 (jint)info.runningState,
+                                 (jint)info.claimState);
+    if (app == NULL) {
         return NULL;
     }
-    if (SetStringField(env, appInfo, infoFriendlyNameFID, info.userDefinedName)) {
+    if (SetStringField(env, app, infoFriendlyNameFID, info.userDefinedName)) {
         return NULL;
     }
-    if (SetStringField(env, appInfo, infoAppNameFID, info.appName)) {
+    if (SetStringField(env, app, infoAppNameFID, info.appName)) {
         return NULL;
     }
-    if (SetStringField(env, appInfo, infoAppIdFID, info.peerID.ToString())) {
+    if (SetStringField(env, app, infoAppIdFID, info.aki)) {
         return NULL;
     }
-    if (SetStringField(env, appInfo, infoDevNameFID, info.deviceName)) {
+    if (SetStringField(env, app, infoDevNameFID, info.deviceName)) {
         return NULL;
     }
     jbyteArray keyData = env->NewByteArray(KEY_ARRAY_SIZE);
@@ -232,7 +232,7 @@ jobject Common::ToApplicationInfoObject(JNIEnv* env, const ApplicationInfo& info
             if (ER_OK == info.publicKey.Export(data, &size)) {
                 memcpy(nativeData, data, size);
                 env->ReleaseByteArrayElements(keyData, nativeData, 0);
-                env->SetObjectField(appInfo, infoPubKeyFID, keyData);
+                env->SetObjectField(app, infoPubKeyFID, keyData);
             } else {
                 env->ReleaseByteArrayElements(keyData, nativeData, 0);
                 Common::Throw(env, ILLEGALARGUMENTEXCEPTION_CLASS, "Bad key size.");
@@ -242,22 +242,22 @@ jobject Common::ToApplicationInfoObject(JNIEnv* env, const ApplicationInfo& info
             }
         }
     }
-    return appInfo;
+    return app;
 }
 
-ApplicationInfo Common::ToNativeInfo(JNIEnv* env, jobject appInfo)
+Application Common::ToNativeInfo(JNIEnv* env, jobject app)
 {
-    ApplicationInfo info;
-    if (appInfo == NULL) {
+    Application info;
+    if (app == NULL) {
         Throw(env, NULLPOINTEREXCEPTION_CLASS, "");
         return info;
     }
-    jbyteArray keyData = (jbyteArray)env->GetObjectField(appInfo, infoPubKeyFID);
+    jbyteArray keyData = (jbyteArray)env->GetObjectField(app, infoPubKeyFID);
     if (env->ExceptionCheck()) {
         return info;
     }
     if (keyData == NULL) {
-        Throw(env, ILLEGALARGUMENTEXCEPTION_CLASS, "Key not set ApplicationInfo");
+        Throw(env, ILLEGALARGUMENTEXCEPTION_CLASS, "Key not set Application");
         return info;
     }
     uint8_t nativeData[KEY_ARRAY_SIZE];
@@ -269,7 +269,7 @@ ApplicationInfo Common::ToNativeInfo(JNIEnv* env, jobject appInfo)
     if (ER_OK != info.publicKey.Import(nativeData, sizeof(nativeData))) {
         Throw(env, ILLEGALARGUMENTEXCEPTION_CLASS, "Invalid public key data.");
     }
-    info.peerID = GetStringField(env, appInfo, infoAppIdFID);
+    info.aki = GetStringField(env, app, infoAppIdFID);
     return info;
 }
 
@@ -332,8 +332,8 @@ qcc::String Common::GetStringField(JNIEnv* env, jobject object, jfieldID fieldID
     return ToNativeString(env, jString);
 }
 
-void Common::OnApplicationStateChange(const ApplicationInfo* oldAppInfo,
-                                      const ApplicationInfo* newAppInfo)
+void Common::OnApplicationStateChange(const OnlineApplication* oldApp,
+                                      const OnlineApplication* newApp)
 {
     JNIEnv* env;
     int attached = GetJNIEnv(&env);
@@ -343,11 +343,11 @@ void Common::OnApplicationStateChange(const ApplicationInfo* oldAppInfo,
     }
 
     do {
-        jobject newInfo = newAppInfo ? ToApplicationInfoObject(env, *newAppInfo) : NULL;
+        jobject newInfo = newApp ? ToApplicationObject(env, *newAppInfo) : NULL;
         if (env->ExceptionCheck()) {
             break;
         }
-        jobject oldInfo = oldAppInfo ? ToApplicationInfoObject(env, *oldAppInfo) : NULL;
+        jobject oldInfo = oldApp ? ToApplicationObject(env, *oldAppInfo) : NULL;
         if (env->ExceptionCheck()) {
             break;
         }
@@ -450,7 +450,7 @@ error:
     return NULL;
 }
 
-bool Common::ApproveManifest(const ApplicationInfo& appInfo,
+bool Common::ApproveManifest(const Application& app,
                              const PermissionPolicy::Rule* manifestRules,
                              const size_t manifestRulesCount)
 {
@@ -460,17 +460,17 @@ bool Common::ApproveManifest(const ApplicationInfo& appInfo,
     if (attached != -1) {
         jobjectArray jManifestRules = Common::ToManifestRules(env, manifestRules, manifestRulesCount);
         if (jManifestRules != NULL) {
-            accept = CallManifestCallback(env, appInfo, jManifestRules);
+            accept = CallManifestCallback(env, app, jManifestRules);
         }
         Common::DetachThread(env, attached);
     }
     return accept;
 }
 
-bool Common::CallManifestCallback(JNIEnv* env, const ApplicationInfo& appInfo, jobject manifest)
+bool Common::CallManifestCallback(JNIEnv* env, const Application& app, jobject manifest)
 {
     bool result = false;
-    jobject jAppInfo = ToApplicationInfoObject(env, appInfo);
+    jobject jAppInfo = ToApplicationObject(env, app);
     if (jAppInfo) {
         jboolean accepted = env->CallBooleanMethod(jSecmgr, mgrMnfCallbackMID, jAppInfo, manifest);
         //There could be a java exception pending

@@ -14,35 +14,37 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef REMOTEAPPLICATIONMANAGER_H_
-#define REMOTEAPPLICATIONMANAGER_H_
+#ifndef ALLJOYN_SECMGR_REMOTEAPPLICATIONMANAGER_H_
+#define ALLJOYN_SECMGR_REMOTEAPPLICATIONMANAGER_H_
 
-#include <alljoyn/securitymgr/ApplicationInfo.h>
-
-#include "ProxyObjectManager.h"
+#include <alljoyn/securitymgr/GroupInfo.h>
+#include <alljoyn/securitymgr/Application.h>
+#include <alljoyn/securitymgr/Manifest.h>
 
 #include <qcc/CertificateECC.h>
-#include <alljoyn/PermissionPolicy.h>
 #include <qcc/String.h>
+#include <alljoyn/PermissionPolicy.h>
 #include <alljoyn/Status.h>
+
+#include "ProxyObjectManager.h"
 
 namespace ajn {
 namespace securitymgr {
 class RemoteApplicationManager {
   private:
-    ProxyObjectManager* proxyObjectManager;          // Not Owned
+    ProxyObjectManager* proxyObjectManager;          // Owned
     ajn::BusAttachment* ba;                          // Not owned
 
   public:
 
-    RemoteApplicationManager(ProxyObjectManager* proxyObjectManager,
-                             ajn::BusAttachment* _ba) :
-        proxyObjectManager(proxyObjectManager), ba(_ba)
+    RemoteApplicationManager(ajn::BusAttachment* _ba) :
+        proxyObjectManager(new ProxyObjectManager(_ba)), ba(_ba)
     {
     }
 
     ~RemoteApplicationManager()
     {
+        delete proxyObjectManager;
     }
 
     bool Initialized(void)
@@ -50,43 +52,36 @@ class RemoteApplicationManager {
         return (NULL != proxyObjectManager);
     }
 
-    QStatus Claim(const ApplicationInfo& app,
+    QStatus Claim(const OnlineApplication& app,
                   qcc::KeyInfoNISTP256& certificateAuthority,
-                  qcc::GUID128& adminGroupId,
-                  qcc::KeyInfoNISTP256& adminGroup,
+                  GroupInfo& adminGroup,
                   qcc::IdentityCertificate* identityCertChain,
                   size_t identityCertChainSize,
-                  PermissionPolicy::Rule* manifest,
-                  size_t manifestSize);
+                  Manifest& manifest);
 
-    QStatus InstallMembership(const ApplicationInfo& app,
-                              qcc::MembershipCertificate& cert);
+    QStatus InstallMembership(const OnlineApplication& app,
+                              qcc::MembershipCertificate* certChain,
+                              size_t certChainSize);
 
-    QStatus InstallIdentity(const ApplicationInfo& app,
-                            qcc::IdentityCertificate* certChain,
-                            size_t certChainSize,
-                            const PermissionPolicy::Rule* manifest,
-                            size_t manifestSize);
+    QStatus UpdateIdentity(const OnlineApplication& app,
+                           qcc::IdentityCertificate* certChain,
+                           size_t certChainSize,
+                           const Manifest& mf);
 
-    QStatus InstallPolicy(const ApplicationInfo& app,
-                          PermissionPolicy& policy);
+    QStatus UpdatePolicy(const OnlineApplication& app,
+                         const PermissionPolicy& policy);
 
-    QStatus Reset(const ApplicationInfo& app);
+    QStatus Reset(const OnlineApplication& app);
 
-    QStatus GetIdentity(const ApplicationInfo& app,
+    QStatus GetIdentity(const OnlineApplication& app,
                         qcc::IdentityCertificate& idCert);
 
-    QStatus GetPolicy(const ApplicationInfo& app,
+    QStatus GetPolicy(const OnlineApplication& app,
                       PermissionPolicy& policy);
 
-    QStatus GetManifest(const ApplicationInfo& app,
-                        PermissionPolicy::Rule** manifestRules,
-                        size_t* manifestRulesCount);
-
-    QStatus RemoveMembership(const ApplicationInfo& app,
-                             const qcc::String& serialNum,
-                             const qcc::String& issuerKeyId);
+    QStatus GetManifestTemplate(const OnlineApplication& app,
+                                Manifest& manifest);
 };
 }
 }
-#endif /* REMOTEAPPLICATIONMANAGER_H_ */
+#endif /* ALLJOYN_SECMGR_REMOTEAPPLICATIONMANAGER_H_ */

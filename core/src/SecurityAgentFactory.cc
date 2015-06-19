@@ -14,25 +14,22 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#include <alljoyn/securitymgr/SecurityManagerFactory.h>
-#include <alljoyn/securitymgr/SecurityManager.h>
+#include <alljoyn/securitymgr/SecurityAgentFactory.h>
 
-#include <qcc/CryptoECC.h>
-
-#define QCC_MODULE "SEC_MGR"
+#define QCC_MODULE "SEGMGR_AGENT"
 
 using namespace ajn;
 using namespace qcc;
 using namespace securitymgr;
 
-SecurityManagerFactory::SecurityManagerFactory()
+SecurityAgentFactory::SecurityAgentFactory()
 {
     ownBa = false;
     status = ER_OK;
     ba = NULL;
 }
 
-SecurityManagerFactory::~SecurityManagerFactory()
+SecurityAgentFactory::~SecurityAgentFactory()
 {
     if (ownBa == true) {
         ba->Disconnect();
@@ -42,22 +39,20 @@ SecurityManagerFactory::~SecurityManagerFactory()
     }
 }
 
-SecurityManager* SecurityManagerFactory::GetSecurityManager(const Storage* storage,
-                                                            BusAttachment* _ba)
+SecurityAgent* SecurityAgentFactory::GetSecurityAgent(const SecurityAgentIdentityInfo& securityAgentIdendtityInfo,
+                                                      const shared_ptr<CaStorage>& caStorage,
+                                                      BusAttachment* _ba)
 {
-    SecurityManager* sm = NULL;
+    SecurityAgent* sa = nullptr;
 
-    if (!storage) {
-        QCC_LogError(ER_FAIL, ("NULL Storage"));
-        return NULL;
-    }
-
-    if (_ba == NULL) {
-        if (ba == NULL) {
-            ba = new BusAttachment("SecurityMgr", true);
+    if (_ba == nullptr) {
+        if (ba == nullptr) {
+            ba =
+                new BusAttachment((securityAgentIdendtityInfo.name.empty() ? "SecurityAgent" :
+                                   securityAgentIdendtityInfo.
+                                   name.c_str()), true);
             ownBa = true;
             do {
-                // \todo provide sensible data or remove name argument
                 status = ba->Start();
                 if (status != ER_OK) {
                     QCC_LogError(status, ("Failed to start bus attachment"));
@@ -70,16 +65,17 @@ SecurityManager* SecurityManagerFactory::GetSecurityManager(const Storage* stora
                     break;
                 }
             } while (0);
-            _ba = ba;             //TODO: don't override; clean up code
         }
+    } else {
+        ba = _ba;
     }
 
-    sm = new SecurityManager(_ba, storage);
-    if (NULL == sm || ER_OK != sm->Init()) {
-        delete sm;
-        sm = NULL;
+    sa = new SecurityAgent(securityAgentIdendtityInfo, caStorage, ba);
+    if (nullptr == sa || ER_OK != sa->Init()) {
+        delete sa;
+        sa = nullptr;
     }
-    return sm;
+    return sa;
 }
 
 #undef QCC_MODULE

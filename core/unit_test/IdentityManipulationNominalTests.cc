@@ -48,16 +48,16 @@ TEST_F(IdentityManipulationNominalTests, IdentityManipBasic) {
     identityInfo.guid = guid;
     identityInfo.name = name;
 
-    ASSERT_EQ(secMgr->StoreIdentity(identityInfo), ER_OK);
+    ASSERT_EQ(storage->StoreIdentity(identityInfo), ER_OK);
 
     identityInfo.name.clear();
     ASSERT_EQ(identityInfo.name, qcc::String(""));
-    ASSERT_EQ(secMgr->GetIdentity(identityInfo), ER_OK);
+    ASSERT_EQ(storage->GetIdentity(identityInfo), ER_OK);
     ASSERT_EQ(identityInfo.guid, guid);
     ASSERT_EQ(identityInfo.name, name);
 
-    ASSERT_EQ(secMgr->RemoveIdentity(identityInfo), ER_OK);
-    ASSERT_EQ(secMgr->GetIdentity(identityInfo), ER_END_OF_DATA);
+    ASSERT_EQ(storage->RemoveIdentity(identityInfo), ER_OK);
+    ASSERT_EQ(storage->GetIdentity(identityInfo), ER_END_OF_DATA);
 }
 
 /**
@@ -88,10 +88,10 @@ TEST_F(IdentityManipulationNominalTests, IdentityManipManyIdentities) {
 
         tmp.clear();
         tmp << desc << i;
-        ASSERT_EQ(secMgr->StoreIdentity(identityInfo), ER_OK);
+        ASSERT_EQ(storage->StoreIdentity(identityInfo), ER_OK);
     }
 
-    ASSERT_EQ(secMgr->GetIdentities(identities), ER_OK);
+    ASSERT_EQ(storage->GetIdentities(identities), ER_OK);
     ASSERT_EQ(identities.size(), (size_t)times);
 
     for (std::vector<IdentityInfo>::iterator g = identities.begin(); g != identities.end(); g++) {
@@ -104,12 +104,12 @@ TEST_F(IdentityManipulationNominalTests, IdentityManipManyIdentities) {
         tmp << desc << i;
 
         ASSERT_EQ(g->name, compareToIdentity.name);
-        ASSERT_EQ(secMgr->RemoveIdentity(*g), ER_OK);
+        ASSERT_EQ(storage->RemoveIdentity(*g), ER_OK);
     }
 
     identities.clear();
 
-    ASSERT_EQ(secMgr->GetIdentities(identities), ER_OK);
+    ASSERT_EQ(storage->GetIdentities(identities), ER_OK);
     ASSERT_TRUE(identities.empty());
 }
 }

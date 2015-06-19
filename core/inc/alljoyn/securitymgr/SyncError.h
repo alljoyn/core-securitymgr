@@ -14,13 +14,13 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef SYNCERROR_H_
-#define SYNCERROR_H_
+#ifndef ALLJOYN_SECMGR_SYNCERROR_H_
+#define ALLJOYN_SECMGR_SYNCERROR_H_
 
 #include <qcc/CertificateECC.h>
 #include <alljoyn/PermissionPolicy.h>
 #include <alljoyn/Status.h>
-#include <alljoyn/securitymgr/ApplicationInfo.h>
+#include <alljoyn/securitymgr/Application.h>
 
 namespace ajn {
 namespace securitymgr {
@@ -42,35 +42,35 @@ typedef enum {
  */
 class SyncError {
   public:
-    SyncError(ApplicationInfo appInfo, QStatus status, SyncErrorType type) :
-        appInfo(appInfo), status(status), type(type),
+    SyncError(OnlineApplication app, QStatus status, SyncErrorType type) :
+        app(app), status(status), type(type),
         idCert(NULL), membCert(NULL), policy(NULL)
     {
     }
 
-    SyncError(ApplicationInfo appInfo, QStatus status, const qcc::IdentityCertificate& ic) :
-        appInfo(appInfo), status(status), type(SYNC_ER_IDENTITY),
+    SyncError(OnlineApplication app, QStatus status, const qcc::IdentityCertificate& ic) :
+        app(app), status(status), type(SYNC_ER_IDENTITY),
         membCert(NULL), policy(NULL)
     {
         idCert = new qcc::IdentityCertificate(ic);
     }
 
-    SyncError(ApplicationInfo appInfo, QStatus status, const qcc::MembershipCertificate& mc) :
-        appInfo(appInfo), status(status), type(SYNC_ER_MEMBERSHIP),
+    SyncError(OnlineApplication app, QStatus status, const qcc::MembershipCertificate& mc) :
+        app(app), status(status), type(SYNC_ER_MEMBERSHIP),
         idCert(NULL), policy(NULL)
     {
         membCert = new qcc::MembershipCertificate(mc);
     }
 
-    SyncError(ApplicationInfo appInfo, QStatus status, const PermissionPolicy& p) :
-        appInfo(appInfo), status(status), type(SYNC_ER_POLICY),
+    SyncError(OnlineApplication app, QStatus status, const PermissionPolicy& p) :
+        app(app), status(status), type(SYNC_ER_POLICY),
         idCert(NULL), membCert(NULL)
     {
         policy = new PermissionPolicy(p);
     }
 
     SyncError(const SyncError& other) :
-        appInfo(other.appInfo), status(other.status), type(other.type),
+        app(other.app), status(other.status), type(other.type),
         idCert(NULL), membCert(NULL), policy(NULL)
     {
         if (other.idCert) {
@@ -107,7 +107,7 @@ class SyncError {
     }
 
     /*@{*/
-    ApplicationInfo appInfo; /**< the application that could not be synchronized */
+    OnlineApplication app; /**< the application that could not be synchronized */
     QStatus status; /**< the status as returned by the application */
     SyncErrorType type; /**< the type of the synchronization error */
 
@@ -120,4 +120,4 @@ class SyncError {
 }
 }
 
-#endif /* SYNCERROR_H_ */
+#endif /* ALLJOYN_SECMGR_SYNCERROR_H_ */

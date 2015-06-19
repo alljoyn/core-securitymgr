@@ -65,12 +65,12 @@ TEST_F(ManifestCoreTests, SuccessfulGetManifest) {
     stub = new Stub(&tcl);
 
     /* Wait for signals */
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
 
     IdentityInfo idInfo;
     idInfo.guid = GUID128("abcdef123456789");
     idInfo.name = "TestIdentity";
-    ASSERT_EQ(secMgr->StoreIdentity(idInfo), ER_OK);
+    ASSERT_EQ(storage->StoreIdentity(idInfo), ER_OK);
 
     /* Set manifest */
     PermissionPolicy::Rule* rules;
@@ -82,12 +82,14 @@ TEST_F(ManifestCoreTests, SuccessfulGetManifest) {
     ASSERT_EQ(ER_OK, secMgr->Claim(lastAppInfo, idInfo));
 
     /* Check security signal */
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING));
 
     /* Retrieve manifest */
-    const PermissionPolicy::Rule* retrievedRules;
-    size_t retrievedCount;
-    ASSERT_EQ(ER_OK, secMgr->GetManifest(lastAppInfo, &retrievedRules, &retrievedCount));
+    PermissionPolicy::Rule* retrievedRules = NULL;
+    size_t retrievedCount = 0;
+    Manifest mf;
+    ASSERT_EQ(ER_OK, storage->GetManifest(lastAppInfo, mf));
+    ASSERT_EQ(ER_OK, mf.GetRules(&retrievedRules, &retrievedCount));
 
     /* Compare set and retrieved manifest */
     ASSERT_EQ(count, retrievedCount);
@@ -101,6 +103,6 @@ TEST_F(ManifestCoreTests, SuccessfulGetManifest) {
     /* Stop the stub */
     delete stub;
     stub = NULL;
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 }
 } // namespace

@@ -25,7 +25,7 @@
 #include "Common.h"
 #include "vector"
 
-#define QCC_MODULE "SEC_MGR"
+#define QCC_MODULE "SEGMGR_AGENT"
 
 /* Impl for class SecurityManagerJNI */
 
@@ -437,11 +437,11 @@ out:
 
 JNIEXPORT void JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_initJNI(JNIEnv* env,
                                                                                jclass thisClass,
-                                                                               jclass appInfoClass,
+                                                                               jclass appClass,
                                                                                jclass ruleClass,
                                                                                jclass memberClass)
 {
-    Common::initCommon(env, thisClass, appInfoClass, ruleClass, memberClass);
+    Common::initCommon(env, thisClass, appClass, ruleClass, memberClass);
 }
 
 JNIEXPORT jboolean JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_init(JNIEnv* env,
@@ -512,19 +512,19 @@ JNIEXPORT void JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_getApplic
 
     SecurityManager* smc = Common::GetSecurityManager(env, thisObj);
     if (smc) {
-        std::vector<ApplicationInfo> list = smc->GetApplications();
-        std::vector<ApplicationInfo>::const_iterator it = list.begin();
+        std::vector<Application> list = smc->GetApplications();
+        std::vector<Application>::const_iterator it = list.begin();
         for (; it != list.end(); ++it) {
-            ApplicationInfo info = *it;
-            jobject appInfo = Common::ToApplicationInfoObject(env, info);
+            Application info = *it;
+            jobject app = Common::ToApplicationObject(env, info);
             if (env->ExceptionCheck()) {
                 return;
             }
-            env->CallBooleanMethod(jlist, addID, appInfo);
+            env->CallBooleanMethod(jlist, addID, app);
             if (env->ExceptionCheck()) {
                 return;
             }
-            env->DeleteLocalRef(appInfo);
+            env->DeleteLocalRef(app);
         }
     }
 }
@@ -710,7 +710,7 @@ JNIEXPORT jobject JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_getGui
 
 JNIEXPORT void JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_claimApplication(JNIEnv* env,
                                                                                         jobject thisObject,
-                                                                                        jobject appInfo,
+                                                                                        jobject app,
                                                                                         jbyteArray idGuid,
                                                                                         jbyteArray jKey)
 {
@@ -721,7 +721,7 @@ JNIEXPORT void JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_claimAppl
         if (env->ExceptionCheck()) {
             return;
         }
-        ApplicationInfo info = Common::ToNativeInfo(env, appInfo);
+        Application info = Common::ToNativeInfo(env, app);
         if (env->ExceptionCheck()) {
             return;
         }
@@ -767,7 +767,7 @@ JNIEXPORT void JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_installPo
 {
     SecurityManager* smc = Common::GetSecurityManager(env, thisObject);
     if (smc) {
-        ApplicationInfo appInfo = Common::ToNativeInfo(env, jAppInfo);
+        Application app = Common::ToNativeInfo(env, jAppInfo);
         if (env->ExceptionCheck()) {
             return;
         }
@@ -780,7 +780,7 @@ JNIEXPORT void JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_installPo
             return;
         }
         policy.SetTerms(term_count, terms);
-        QStatus status = smc->UpdatePolicy(appInfo, policy);
+        QStatus status = smc->UpdatePolicy(app, policy);
         if (status != ER_OK) {
             QCC_LogError(status, ("Failed to set policy"));
             Common::Throw(env, SECURITY_MNGT_EXCEPTION_CLASS, "Failed to set Policy");
@@ -806,7 +806,7 @@ JNIEXPORT void JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_installMe
         if (env->ExceptionCheck()) {
             return;
         }
-        ApplicationInfo appInfo = Common::ToNativeInfo(env, jAppInfo);
+        Application app = Common::ToNativeInfo(env, jAppInfo);
         if (env->ExceptionCheck()) {
             return;
         }
@@ -823,7 +823,7 @@ JNIEXPORT void JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_installMe
             authData = NULL;
         }
 
-        QStatus status = smc->InstallMembership(appInfo, info, authData);
+        QStatus status = smc->InstallMembership(app, info, authData);
         if (status != ER_OK) {
             QCC_LogError(status, ("Failed to add membership"));
             Common::Throw(env, SECURITY_MNGT_EXCEPTION_CLASS,
@@ -847,11 +847,11 @@ JNIEXPORT void JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_deleteMem
         if (env->ExceptionCheck()) {
             return;
         }
-        ApplicationInfo appInfo = Common::ToNativeInfo(env, jAppInfo);
+        Application app = Common::ToNativeInfo(env, jAppInfo);
         if (env->ExceptionCheck()) {
             return;
         }
-        QStatus status = smc->RemoveMembership(appInfo, info);
+        QStatus status = smc->RemoveMembership(app, info);
         if (status != ER_OK) {
             QCC_LogError(status, ("Failed to delete membership"));
             Common::Throw(env, SECURITY_MNGT_EXCEPTION_CLASS,
@@ -864,15 +864,15 @@ JNIEXPORT void JNICALL Java_org_alljoyn_securitymgr_SecurityManagerJNI_unclaimAp
                                                                                           jobject
                                                                                           thisObject,
                                                                                           jobject
-                                                                                          applicationInfo)
+                                                                                          app)
 {
     SecurityManager* smc = Common::GetSecurityManager(env, thisObject);
     if (smc) {
-        ApplicationInfo appInfo = Common::ToNativeInfo(env, applicationInfo);
+        Application app = Common::ToNativeInfo(env, app);
         if (env->ExceptionCheck()) {
             return;
         }
-        QStatus status = smc->Reset(appInfo);
+        QStatus status = smc->Reset(app);
         if (status != ER_OK) {
             QCC_LogError(status, ("Failed to unclaim application"));
             Common::Throw(env, SECURITY_MNGT_EXCEPTION_CLASS,

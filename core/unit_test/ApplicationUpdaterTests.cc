@@ -33,21 +33,21 @@ class ApplicationUpdaterTests :
   public:
     ApplicationUpdaterTests()
     {
-        qcc::GUID128 guildGUID(0xab);
-        qcc::String guildName = "Test";
-        qcc::String guildDesc = "This is a test guild";
+        qcc::GUID128 groupGUID(0xab);
+        qcc::String groupName = "Test";
+        qcc::String groupDesc = "This is a test group";
 
-        guildInfo.guid = guildGUID;
-        guildInfo.name = guildName;
-        guildInfo.desc = guildDesc;
+        groupInfo.guid = groupGUID;
+        groupInfo.name = groupName;
+        groupInfo.desc = groupDesc;
 
-        policyGuilds.push_back(guildGUID);
+        policyGroups.push_back(groupGUID);
     }
 
   public:
-    GuildInfo guildInfo;
+    GroupInfo groupInfo;
     PermissionPolicy policy;
-    vector<GUID128> policyGuilds;
+    vector<GUID128> policyGroups;
 };
 
 /**
@@ -64,18 +64,18 @@ TEST_F(ApplicationUpdaterTests, Reset) {
     delete stub;
     stub = NULL;
 
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 
     // reset the stub
-    ASSERT_EQ(ER_OK, secMgr->Reset(lastAppInfo));
-    ApplicationInfo checkUpdatesPendingInfo;
+    ASSERT_EQ(ER_OK, storage->RemoveApplication(lastAppInfo));
+    OnlineApplication checkUpdatesPendingInfo;
     checkUpdatesPendingInfo.publicKey = lastAppInfo.publicKey;
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_TRUE(checkUpdatesPendingInfo.updatesPending); // The app was off-line so the reset was not done remotely
 
     // restart the stub
     stub = new Stub(tcl, true);
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMABLE, ajn::securitymgr::STATE_RUNNING, false));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMABLE, ajn::securitymgr::STATE_RUNNING, false));
 
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
@@ -92,20 +92,22 @@ TEST_F(ApplicationUpdaterTests, InstallMembership) {
     // stop the stub
     delete stub;
     stub = NULL;
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 
     // change security configuration
-    ASSERT_EQ(ER_OK, secMgr->StoreGuild(guildInfo));
+    ASSERT_EQ(ER_OK, storage->StoreGroup(groupInfo));
 
-    ASSERT_EQ(ER_OK, secMgr->InstallMembership(lastAppInfo, guildInfo));
-    ApplicationInfo checkUpdatesPendingInfo;
+    ASSERT_EQ(ER_OK, storage->InstallMembership(lastAppInfo, groupInfo));
+    OnlineApplication checkUpdatesPendingInfo;
     checkUpdatesPendingInfo.publicKey = lastAppInfo.publicKey;
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING, true));
+
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_TRUE(checkUpdatesPendingInfo.updatesPending); // The app was off-line so the membership cert was not installed remotely
 
     // restart the stub
     stub = new Stub(tcl, true);
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
 
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
@@ -121,23 +123,23 @@ TEST_F(ApplicationUpdaterTests, UpdatePolicy) {
     // stop the stub
     delete stub;
     stub = NULL;
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 
     // change security configuration
-    ASSERT_EQ(ER_OK, secMgr->StoreGuild(guildInfo));
-    vector<GuildInfo> guilds;
-    guilds.push_back(guildInfo);
-    PolicyGenerator::DefaultPolicy(guilds, policy);
-    ASSERT_EQ(ER_OK, secMgr->UpdatePolicy(lastAppInfo, policy));
+    ASSERT_EQ(ER_OK, storage->StoreGroup(groupInfo));
+    vector<GroupInfo> groups;
+    groups.push_back(groupInfo);
+    PolicyGenerator::DefaultPolicy(groups, policy);
+    ASSERT_EQ(ER_OK, storage->UpdatePolicy(lastAppInfo, policy));
 
-    ApplicationInfo checkUpdatesPendingInfo;
+    OnlineApplication checkUpdatesPendingInfo;
     checkUpdatesPendingInfo.publicKey = lastAppInfo.publicKey;
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_TRUE(checkUpdatesPendingInfo.updatesPending); // The app was off-line so the policy was not installed remotely
 
     // restart the stub
     stub = new Stub(tcl, true);
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
 
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
@@ -150,27 +152,26 @@ TEST_F(ApplicationUpdaterTests, UpdatePolicy) {
  *       -# Install an identity certificate using the security manager.
  *       -# Restart the remote application.
  **/
-// TODO : Investigate AS-1488 to re-enable the test
-TEST_F(ApplicationUpdaterTests, DISABLED_InstallIdentity) {
+TEST_F(ApplicationUpdaterTests, InstallIdentity) {
     // stop the stub
     delete stub;
     stub = NULL;
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 
     // change security configuration
     IdentityInfo identityInfo2;
     identityInfo2.name = "Updated test name";
-    ASSERT_EQ(ER_OK, secMgr->StoreIdentity(identityInfo2));
-    ASSERT_EQ(ER_OK, secMgr->UpdateIdentity(lastAppInfo, identityInfo2));
+    ASSERT_EQ(ER_OK, storage->StoreIdentity(identityInfo2));
+    ASSERT_EQ(ER_OK, storage->UpdateIdentity(lastAppInfo, identityInfo2));
 
-    ApplicationInfo checkUpdatesPendingInfo;
+    OnlineApplication checkUpdatesPendingInfo;
     checkUpdatesPendingInfo.publicKey = lastAppInfo.publicKey;
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_TRUE(checkUpdatesPendingInfo.updatesPending); // The app was off-line so the identity was not installed remotely
 
     // restart the stub
     stub = new Stub(tcl, true);
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
 
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
@@ -194,42 +195,42 @@ TEST_F(ApplicationUpdaterTests, UpdateAll) {
     // stop the stub
     delete stub;
     stub = NULL;
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 
     // change security configuration
-    ASSERT_EQ(ER_OK, secMgr->StoreGuild(guildInfo));
-    ASSERT_EQ(ER_OK, secMgr->InstallMembership(lastAppInfo, guildInfo));
-    vector<GuildInfo> guilds;
-    guilds.push_back(guildInfo);
-    PolicyGenerator::DefaultPolicy(guilds, policy);
-    ASSERT_EQ(ER_OK, secMgr->UpdatePolicy(lastAppInfo, policy));
+    ASSERT_EQ(ER_OK, storage->StoreGroup(groupInfo));
+    ASSERT_EQ(ER_OK, storage->InstallMembership(lastAppInfo, groupInfo));
+    vector<GroupInfo> groups;
+    groups.push_back(groupInfo);
+    PolicyGenerator::DefaultPolicy(groups, policy);
+    ASSERT_EQ(ER_OK, storage->UpdatePolicy(lastAppInfo, policy));
     IdentityInfo identityInfo2;
     identityInfo2.name = "Updated test name";
-    ASSERT_EQ(ER_OK, secMgr->StoreIdentity(identityInfo2));
-    ASSERT_EQ(ER_OK, secMgr->UpdateIdentity(lastAppInfo, identityInfo2));
+    ASSERT_EQ(ER_OK, storage->StoreIdentity(identityInfo2));
+    ASSERT_EQ(ER_OK, storage->UpdateIdentity(lastAppInfo, identityInfo2));
 
-    ApplicationInfo checkUpdatesPendingInfo;
+    OnlineApplication checkUpdatesPendingInfo;
     checkUpdatesPendingInfo.publicKey = lastAppInfo.publicKey;
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_TRUE(checkUpdatesPendingInfo.updatesPending); // The app was off-line so the update was not done remotely
 
     // restart the stub
     stub = new Stub(tcl, true);
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
 
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
 
     // stop the stub
     delete stub;
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 
     // reset the stub
-    ASSERT_EQ(ER_OK, secMgr->Reset(lastAppInfo));
+    ASSERT_EQ(ER_OK, storage->RemoveApplication(lastAppInfo));
 
     // restart the stub
     stub = new Stub(tcl, true);
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMABLE, ajn::securitymgr::STATE_RUNNING, false));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMABLE, ajn::securitymgr::STATE_RUNNING, false));
 
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);

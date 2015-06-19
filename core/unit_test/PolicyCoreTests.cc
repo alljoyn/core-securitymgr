@@ -33,13 +33,13 @@ class PolicyCoreTests :
     {
         idInfo.guid = GUID128();
         idInfo.name = "TestIdentity";
-        guildGUID = qcc::GUID128(0xab);
+        groupGUID = qcc::GUID128(0xab);
     }
 
     IdentityInfo idInfo;
 
-    GUID128 guildGUID;
-    GUID128 guildGUID2;
+    GUID128 groupGUID;
+    GUID128 groupGUID2;
     PermissionPolicy policy;
     PermissionPolicy policy2;
 };
@@ -48,59 +48,63 @@ TEST_F(PolicyCoreTests, SuccessfulInstallPolicy) {
     bool claimAnswer = true;
     TestClaimListener tcl(claimAnswer);
 
-    vector<GuildInfo> policyGuilds;
-    GuildInfo guild;
-    guild.guid = guildGUID;
-    policyGuilds.push_back(guild);
-    PolicyGenerator::DefaultPolicy(policyGuilds, policy);
+    vector<GroupInfo> policyGroups;
+    GroupInfo group;
+    group.guid = groupGUID;
+    policyGroups.push_back(group);
+    PolicyGenerator::DefaultPolicy(policyGroups, policy);
 
-    GuildInfo guild2;
-    guild2.guid = guildGUID2;
-    policyGuilds.push_back(guild2);
-    PolicyGenerator::DefaultPolicy(policyGuilds, policy2);
+    GroupInfo group2;
+    group2.guid = groupGUID2;
+    policyGroups.push_back(group2);
+    PolicyGenerator::DefaultPolicy(policyGroups, policy2);
 
     /* Start the stub */
     stub = new Stub(&tcl);
 
     /* Wait for signals */
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
 
     /* Installing/retrieving policy before claiming should fail */
-    ApplicationInfo appInfo = lastAppInfo;
+    Application app = lastAppInfo;
     PermissionPolicy policyLocal;
-    ASSERT_NE(ER_OK, secMgr->UpdatePolicy(appInfo, policy));
-    ASSERT_NE(ER_OK, secMgr->UpdatePolicy(appInfo, policy2));
-    ASSERT_NE(ER_OK, secMgr->GetPolicy(appInfo, policyLocal));
+    ASSERT_NE(ER_OK, storage->UpdatePolicy(app, policy));
+    ASSERT_NE(ER_OK, storage->UpdatePolicy(app, policy2));
+    ASSERT_NE(ER_OK, storage->GetPolicy(app, policyLocal));
 
-    ApplicationInfo checkUpdatesPendingInfo;
-    checkUpdatesPendingInfo.publicKey = appInfo.publicKey;
+    OnlineApplication checkUpdatesPendingInfo;
+    checkUpdatesPendingInfo.publicKey = app.publicKey;
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
 
     /* Create identity */
-    ASSERT_EQ(secMgr->StoreIdentity(idInfo), ER_OK);
+    ASSERT_EQ(storage->StoreIdentity(idInfo), ER_OK);
 
     /* Claim application */
     ASSERT_EQ(ER_OK, secMgr->Claim(lastAppInfo, idInfo));
 
     /* Check security signal */
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING));
 
     /* Check default policy */
-    ASSERT_EQ(ER_END_OF_DATA, secMgr->GetPolicy(appInfo, policyLocal));
+    ASSERT_EQ(ER_END_OF_DATA, storage->GetPolicy(app, policyLocal));
 
     /* Install policy and check retrieved policy */
-    ASSERT_EQ(ER_OK, secMgr->UpdatePolicy(appInfo, policy));
-    ASSERT_EQ(ER_OK, secMgr->GetPolicy(appInfo, policyLocal));
-    ASSERT_EQ((size_t)1, policyLocal.GetTermsSize());
+    ASSERT_EQ(ER_OK, storage->UpdatePolicy(app, policy));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, true));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
+    ASSERT_EQ(ER_OK, storage->GetPolicy(app, policyLocal));
+    ASSERT_EQ((size_t)1, policyLocal.GetAclsSize());
 
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
 
     /* Install another policy and check retrieved policy */
-    ASSERT_EQ(ER_OK, secMgr->UpdatePolicy(appInfo, policy2));
-    ASSERT_EQ(ER_OK, secMgr->GetPolicy(appInfo, policyLocal));
-    ASSERT_EQ((size_t)2, policyLocal.GetTermsSize());
+    ASSERT_EQ(ER_OK, storage->UpdatePolicy(app, policy2));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, true));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
+    ASSERT_EQ(ER_OK, storage->GetPolicy(app, policyLocal));
+    ASSERT_EQ((size_t)2, policyLocal.GetAclsSize());
 
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
@@ -111,6 +115,6 @@ TEST_F(PolicyCoreTests, SuccessfulInstallPolicy) {
     /* Stop the stub */
     delete stub;
     stub = NULL;
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 }
 } // namespace

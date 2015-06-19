@@ -14,7 +14,7 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#define QCC_MODULE "SEC_MGR"
+#define QCC_MODULE "SEGMGR_AGENT"
 
 #include <alljoyn/securitymgr/ApplicationState.h>
 
@@ -51,23 +51,23 @@ ApplicationRunningState ToRunningState(const unsigned char byte)
     return STATE_UNKNOWN_RUNNING;
 };
 
-const char* ToString(const PermissionConfigurator::ClaimableState acs)
+const char* ToString(const PermissionConfigurator::ApplicationState acs)
 {
     switch (acs) {
-    case PermissionConfigurator::STATE_UNCLAIMABLE:
-        return "NOT CLAIMED";
+    case PermissionConfigurator::NOT_CLAIMABLE:
+        return "NOT CLAIMABLE";
 
-    case PermissionConfigurator::STATE_CLAIMABLE:
+    case PermissionConfigurator::CLAIMABLE:
         return "CLAIMABLE";
 
-    case PermissionConfigurator::STATE_CLAIMED:
+    case PermissionConfigurator::CLAIMED:
         return "CLAIMED";
 
-    case PermissionConfigurator::STATE_UNKNOWN:
-        return "UNKNOWN CLAIM STATE";
+    case PermissionConfigurator::NEED_UPDATE:
+        return "NEED UPDATE";
     }
 
-    return "UNKNOWN CLAIM STATE";
+    return "UNKNOWN";
 };
 }
 }

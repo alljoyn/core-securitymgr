@@ -14,25 +14,44 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef COMMON_H_
-#define COMMON_H_
+#ifndef ALLJOYN_SECMGR_SECURITYAGENTIDENTITYINFO_H_
+#define ALLJOYN_SECMGR_SECURITYAGENTIDENTITYINFO_H_
 
-#include <qcc/CryptoECC.h>
-#include <alljoyn/PermissionConfigurator.h>
-#include <alljoyn/Message.h>
-#include <stdint.h>
+#include <string>
 
-#define QCC_MODULE "SEC_MGR"
+using namespace std;
 
 namespace ajn {
 namespace securitymgr {
-qcc::String ByteArrayToHex(const uint8_t* bytes,
-                           const std::size_t len);
+/*
+ * \brief Represents an identity pertaining to a security agent.
+ */
+struct SecurityAgentIdentityInfo {
+    /**
+     * \brief The name of this security agent.
+     */
+    string name;
 
-qcc::String ByteArrayToString(const AllJoynScalarArray bytes);
+    /**
+     * \brief the version of this security agent.
+     */
+    string version;
 
-qcc::String PubKeyToString(const qcc::ECCPublicKey* pubKey);
+    /**
+     * \brief The vendor of this security agent.
+     */
+    string vendor;
+
+    string ToString() const
+    {
+        string s("SecurityAgentIdentityInfo:");
+        s += "\n  Name: " + name;
+        s += "\n  Version: " + version;
+        s += "\n  Vendor: " + vendor + "\n";
+        return s;
+    }
+};
 }
 }
-#undef QCC_MODULE
-#endif /* COMMON_H_ */
+
+#endif /* ALLJOYN_SECMGR_SECURITYAGENTIDENTITYINFO_H_ */

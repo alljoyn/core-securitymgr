@@ -14,19 +14,18 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef NATIVESTORAGESETTINGS_H_
-#define NATIVESTORAGESETTINGS_H_
+#ifndef ALLJOYN_SECMGR_STORAGE_NATIVESTORAGESETTINGS_H_
+#define ALLJOYN_SECMGR_STORAGE_NATIVESTORAGESETTINGS_H_
 
-#define GUILDS_TABLE_NAME "GUILDS"
+#define GROUPS_TABLE_NAME "GROUPS"
 #define IDENTITY_TABLE_NAME "IDENTITIES"
 #define CLAIMED_APPS_TABLE_NAME "CLAIMED_APPLICATIONS"
 #define IDENTITY_CERTS_TABLE_NAME "IDENTITY_CERTS"
 #define MEMBERSHIP_CERTS_TABLE_NAME "MEMBERSHIP_CERTS"
-#define CERTSDATA_TABLE_NAME "CERTS_DATA"
 #define SERIALNUMBER_TABLE_NAME "SERIALNUMBER"
 
-#define GUILDS_TABLE_SCHEMA \
-    "CREATE TABLE IF NOT EXISTS " GUILDS_TABLE_NAME \
+#define GROUPS_TABLE_SCHEMA \
+    "CREATE TABLE IF NOT EXISTS " GROUPS_TABLE_NAME \
     " (\
         AUTHORITY  BLOB NOT NULL,\
         ID         TEXT NOT NULL,\
@@ -61,15 +60,10 @@
     "CREATE TABLE IF NOT EXISTS " IDENTITY_CERTS_TABLE_NAME \
     " (\
         SUBJECT  BLOB NOT NULL,\
-        VERSION INT NOT NULL,\
         ISSUER BLOB NOT NULL,\
-        VALIDITYFROM UNSIGNED BIG INT NOT NULL,\
-        VALIDITYTO UNSIGNED BIG INT NOT NULL,\
-        SN BLOB NOT NULL,\
-        DATAID BLOB NOT NULL,\
-        ALIAS BLOB NOT NULL,\
-        USERNAME TEXT NOT NULL,\
-        PRIMARY KEY(SUBJECT, DATAID),\
+        DER BLOB NOT NULL,\
+        ID TEXT NOT NULL,\
+        PRIMARY KEY(SUBJECT, ID),\
         FOREIGN KEY(SUBJECT) REFERENCES " CLAIMED_APPS_TABLE_NAME                                                                                                                                                                                                                                                                                                                                                                                    \
     " (APPLICATION_PUBKEY) ON DELETE CASCADE\
 ); "
@@ -78,25 +72,12 @@
     "CREATE TABLE IF NOT EXISTS " MEMBERSHIP_CERTS_TABLE_NAME \
     " (\
         SUBJECT BLOB NOT NULL,\
-        VERSION TEXT NOT NULL,\
         ISSUER BLOB NOT NULL,\
-        VALIDITYFROM UNSIGNED BIG INT NOT NULL,\
-        VALIDITYTO UNSIGNED BIG INT NOT NULL,\
-        SN BLOB NOT NULL,\
-        DATAID BLOB NOT NULL,\
-        DELEGATE BOOLEAN NOT NULL,\
+        DER BLOB NOT NULL,\
         GUID TEXT NOT NULL,\
         PRIMARY KEY(SUBJECT, GUID),\
         FOREIGN KEY(SUBJECT) REFERENCES " CLAIMED_APPS_TABLE_NAME                                                                                                                                                                                                                                                                                                                                                                                    \
     " (APPLICATION_PUBKEY) ON DELETE CASCADE\
-); "
-
-#define CERTSDATA_TABLE_SCHEMA \
-    "CREATE TABLE IF NOT EXISTS " CERTSDATA_TABLE_NAME \
-    " (\
-        ID BLOB NOT NULL,\
-        DATA BLOB NOT NULL,\
-		PRIMARY KEY(ID)\
 ); "
 
 #define SERIALNUMBER_TABLE_SCHEMA \
@@ -110,4 +91,4 @@
     PRAGMA foreign_keys = ON;\
     PRAGMA journal_mode = OFF; "
 
-#endif
+#endif /* ALLJOYN_SECMGR_STORAGE_NATIVESTORAGESETTINGS_H_ */

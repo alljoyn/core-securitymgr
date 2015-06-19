@@ -114,11 +114,11 @@ Stub::~Stub()
 QStatus Stub::OpenClaimWindow()
 {
     QStatus status = ER_FAIL;
-    if (ajn::PermissionConfigurator::STATE_CLAIMED == pm->GetClaimableState()) {
+    if (ajn::PermissionConfigurator::CLAIMED == pm->GetClaimableState()) {
         std::cerr << "Application is already claimed by a RoT" << std::endl;
         return status;
     }
-    if (ajn::PermissionConfigurator::STATE_CLAIMABLE == pm->GetClaimableState()) {
+    if (ajn::PermissionConfigurator::CLAIMABLE == pm->GetClaimableState()) {
         std::cerr << "Claim window already open" << std::endl;
         return status;
     }
@@ -132,7 +132,7 @@ QStatus Stub::OpenClaimWindow()
 QStatus Stub::CloseClaimWindow()
 {
     QStatus status = ER_FAIL;
-    if ((0 != pm->GetRoTKeys().size()) || (ajn::PermissionConfigurator::STATE_CLAIMED == pm->GetClaimableState())) {
+    if ((0 != pm->GetRoTKeys().size()) || (ajn::PermissionConfigurator::CLAIMED == pm->GetClaimableState())) {
         std::cerr << "Claim window already closed" << std::endl;
         return status;
     }

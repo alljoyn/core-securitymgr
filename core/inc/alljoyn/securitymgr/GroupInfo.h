@@ -14,44 +14,42 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef GUILDINFO_H_
-#define GUILDINFO_H_
+#ifndef ALLJOYN_SECMGR_GROUPINFO_H_
+#define ALLJOYN_SECMGR_GROUPINFO_H_
 
-#include <qcc/CryptoECC.h>
+#include <qcc/KeyInfoECC.h>
 #include <qcc/String.h>
 #include <qcc/GUID.h>
-
-#define QCC_MODULE "SEC_MGR"
 
 namespace ajn {
 namespace securitymgr {
 /*
- * \brief Represents a guild. A guild has two key values: a GUID and a
- *  guild authority. It also contains some additional meta information,
+ * \brief Represents a security group. A group has two key values: a GUID and a
+ *  group authority. It also contains some additional meta information,
  *  like a name and a description.
  */
-struct GuildInfo {
+struct GroupInfo {
     /**
-     * \brief The authority of this guild. It is the public key of the security
-     * manager that created this guild. It is part of the composite key of this
+     * \brief The authority of this group. It is the public key of the security
+     * manager that created this group. It is part of the composite key of this
      * object.
      */
-    qcc::ECCPublicKey authority;
+    qcc::KeyInfoNISTP256 authority;
     /**
-     * \brief The guid of this guild. It is part of the composite key of this
+     * \brief The guid of this group. It is part of the composite key of this
      * object.
      */
     qcc::GUID128 guid;
     /**
-     * \brief The name of this guild.
+     * \brief The name of this group.
      */
     qcc::String name;
     /**
-     * \brief A description for this guild.
+     * \brief A description for this group.
      */
     qcc::String desc;
 
-    bool operator==(const GuildInfo& gi) const
+    bool operator==(const GroupInfo& gi) const
     {
         if (authority != gi.authority) {
             return false;
@@ -66,7 +64,7 @@ struct GuildInfo {
 
     qcc::String ToString() const
     {
-        qcc::String s = "GuildInfo:";
+        qcc::String s = "GroupInfo:";
         s += "\n  authority: ";
         s += authority.ToString();
         s += "\n  guid: ";
@@ -77,5 +75,4 @@ struct GuildInfo {
 };
 }
 }
-#undef QCC_MODULE
-#endif /* GUILDINFO_H_ */
+#endif /* ALLJOYN_SECMGR_GROUPINFO_H_ */

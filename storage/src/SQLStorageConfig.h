@@ -14,8 +14,8 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef SQLSTORAGECONFIG_H_
-#define SQLSTORAGECONFIG_H_
+#ifndef ALLJOYN_SECMGR_STORAGE_SQLSTORAGECONFIG_H_
+#define ALLJOYN_SECMGR_STORAGE_SQLSTORAGECONFIG_H_
 
 #include <qcc/String.h>
 #include <map>
@@ -30,4 +30,4 @@ struct SQLStorageConfig {
 };
 }
 }
-#endif /* SQLSTORAGECONFIG_H_ */
+#endif /* ALLJOYN_SECMGR_STORAGE_SQLSTORAGECONFIG_H_ */

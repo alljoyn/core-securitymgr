@@ -14,8 +14,8 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef APPLICATIONSTATE_H_
-#define APPLICATIONSTATE_H_
+#ifndef ALLJOYN_SECMGR_APPLICATIONSTATE_H_
+#define ALLJOYN_SECMGR_APPLICATIONSTATE_H_
 
 #include <alljoyn/PermissionConfigurator.h>
 
@@ -35,7 +35,7 @@ const char* ToString(ApplicationRunningState acs);
 ApplicationRunningState ToRunningState(const unsigned char byte);
 
 /* This should be moved to core */
-const char* ToString(const PermissionConfigurator::ClaimableState acs);
+const char* ToString(const PermissionConfigurator::ApplicationState acs);
 }
 }
-#endif /* APPLICATIONSTATE_H_ */
+#endif /* ALLJOYN_SECMGR_APPLICATIONSTATE_H_ */

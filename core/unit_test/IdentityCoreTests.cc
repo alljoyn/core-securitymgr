@@ -40,19 +40,22 @@ TEST_F(IdentityCoreTests, SuccessfulInstallIdentity) {
     stub = new Stub(&tcl);
 
     /* Wait for signals */
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
 
     IdentityInfo info;
     info.name = "MyName";
-    ASSERT_EQ(ER_OK, secMgr->StoreIdentity(info));
+    ASSERT_EQ(ER_OK, storage->StoreIdentity(info));
 
     /* Claim! */
     ASSERT_EQ(ER_OK, secMgr->Claim(lastAppInfo, info));
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING));
 
     /* Try to install identity again */
-    ASSERT_EQ(ER_OK, secMgr->UpdateIdentity(lastAppInfo, info));
-    ApplicationInfo checkUpdatesPendingInfo;
+    ASSERT_EQ(ER_OK, storage->UpdateIdentity(lastAppInfo, info));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, true));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
+
+    OnlineApplication checkUpdatesPendingInfo;
     checkUpdatesPendingInfo.publicKey = lastAppInfo.publicKey;
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
@@ -63,6 +66,6 @@ TEST_F(IdentityCoreTests, SuccessfulInstallIdentity) {
     /* Stop the stub */
     delete stub;
     stub = NULL;
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 }
 } // namespace

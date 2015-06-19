@@ -34,41 +34,41 @@ class MembershipCoreTests :
         idInfo.guid = GUID128();
         idInfo.name = "TestIdentity";
 
-        guildInfo1.guid = GUID128();
-        guildInfo1.name = "MyGuild 1";
-        guildInfo1.desc = "My test guild 1 description";
+        groupInfo1.guid = GUID128();
+        groupInfo1.name = "MyGroup 1";
+        groupInfo1.desc = "My test group 1 description";
 
-        guildInfo2.guid = GUID128();
-        guildInfo2.name = "MyGuild 2";
-        guildInfo2.desc = "My test guild 2 description";
+        groupInfo2.guid = GUID128();
+        groupInfo2.name = "MyGroup 2";
+        groupInfo2.desc = "My test group 2 description";
     }
 
     IdentityInfo idInfo;
-    GuildInfo guildInfo1;
-    GuildInfo guildInfo2;
+    GroupInfo groupInfo1;
+    GroupInfo groupInfo2;
 };
 
 TEST_F(MembershipCoreTests, SuccessfulInstallMembership) {
     bool claimAnswer = true;
     TestClaimListener tcl(claimAnswer);
 
-    /* Create guilds */
-    ASSERT_EQ(ER_OK, secMgr->StoreGuild(guildInfo1));
-    ASSERT_EQ(ER_OK, secMgr->StoreGuild(guildInfo2));
+    /* Create groups */
+    ASSERT_EQ(ER_OK, storage->StoreGroup(groupInfo1));
+    ASSERT_EQ(ER_OK, storage->StoreGroup(groupInfo2));
 
     /* Start the stub */
     stub = new Stub(&tcl);
 
     /* Wait for signals */
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
 
     /* Installing or removing membership before claiming should fail */
-    ApplicationInfo appInfo = lastAppInfo;
-    ASSERT_NE(ER_OK, secMgr->InstallMembership(appInfo, guildInfo2)); // fails due to manifest missing in persistency
-    ASSERT_NE(ER_OK, secMgr->RemoveMembership(appInfo, guildInfo2)); // fails due to certificate missing in persistency
+    Application app = lastAppInfo;
+    ASSERT_NE(ER_OK, storage->InstallMembership(app, groupInfo2)); // fails due to manifest missing in persistency
+    ASSERT_NE(ER_OK, storage->RemoveMembership(app, groupInfo2)); // fails due to certificate missing in persistency
 
     /* Create identity */
-    ASSERT_EQ(secMgr->StoreIdentity(idInfo), ER_OK);
+    ASSERT_EQ(storage->StoreIdentity(idInfo), ER_OK);
 
     /* Claim application */
     ASSERT_EQ(ER_OK, secMgr->Claim(lastAppInfo, idInfo));
@@ -76,21 +76,25 @@ TEST_F(MembershipCoreTests, SuccessfulInstallMembership) {
     stub->SetDSASecurity(true);
 
     /* Check security signal */
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
 
-    ASSERT_EQ(ER_OK, secMgr->InstallMembership(appInfo, guildInfo1));
-    ApplicationInfo checkUpdatesPendingInfo;
-    checkUpdatesPendingInfo.publicKey = appInfo.publicKey;
+    ASSERT_EQ(ER_OK, storage->InstallMembership(app, groupInfo1));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, true));
+    OnlineApplication checkUpdatesPendingInfo;
+    checkUpdatesPendingInfo.publicKey = app.publicKey;
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
+
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
 
-    ASSERT_EQ(ER_OK, secMgr->InstallMembership(appInfo, guildInfo2));
+    ASSERT_EQ(ER_OK, storage->InstallMembership(app, groupInfo2));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
     ASSERT_EQ(ER_OK, secMgr->GetApplication(checkUpdatesPendingInfo));
     ASSERT_FALSE(checkUpdatesPendingInfo.updatesPending);
 
-    qcc::Sleep(250);
-    ASSERT_EQ(ER_OK, secMgr->RemoveMembership(appInfo, guildInfo1));
-    ASSERT_EQ(ER_OK, secMgr->RemoveMembership(appInfo, guildInfo2));
+    ASSERT_EQ(ER_OK, storage->RemoveMembership(app, groupInfo1));
+    ASSERT_EQ(ER_OK, storage->RemoveMembership(app, groupInfo2));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING, false));
 
     /* Clear the keystore of the stub */
     stub->Reset();
@@ -98,6 +102,6 @@ TEST_F(MembershipCoreTests, SuccessfulInstallMembership) {
     /* Stop the stub */
     delete stub;
     stub = NULL;
-    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
+    ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_NOT_RUNNING));
 }
 } // namespace

@@ -14,8 +14,8 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef TASKQUEUE_H_
-#define TASKQUEUE_H_
+#ifndef ALLJOYN_SECMGR_TASKQUEUE_H_
+#define ALLJOYN_SECMGR_TASKQUEUE_H_
 
 #include <qcc/Mutex.h>
 #include <qcc/Condition.h>
@@ -133,4 +133,4 @@ class TaskQueue {
 }
 }
 
-#endif /* TASKQUEUE_H_ */
+#endif /* ALLJOYN_SECMGR_TASKQUEUE_H_ */

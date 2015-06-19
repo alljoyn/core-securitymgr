@@ -110,7 +110,7 @@ QStatus PerformDoorAction(BusAttachment& ba, char cmd, qcc::String busName)
     }
 
     /* B. Setup ProxyBusObject:
-     *     - Create a ProxyBusObject from remote application info and session
+     *     - Create a ProxyBusObject from remote application and session
      *     - Get the interface description from the bus based on the remote interface name
      *     - Extend the ProxyBusObject with the interface description
      */
@@ -201,9 +201,12 @@ int main(int arg, char** argv)
     BusAttachment& ba = common.GetBusAttachment();
 #if DOOR_INTF_SECURE == 1
     //Wait until we are claimed...
-    while (PermissionConfigurator::STATE_CLAIMED != ba.GetPermissionConfigurator().GetClaimableState()) {
+    PermissionConfigurator::ApplicationState appState = PermissionConfigurator::NOT_CLAIMABLE;
+    ba.GetPermissionConfigurator().GetApplicationState(appState);
+    while (PermissionConfigurator::CLAIMED != appState) {
         printf("Consumer is not yet Claimed; Waiting to be claimed\n");
         qcc::Sleep(5000);
+        ba.GetPermissionConfigurator().GetApplicationState(appState);
     }
 #endif
     //Register signal hander

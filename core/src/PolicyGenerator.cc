@@ -20,56 +20,53 @@ using namespace ajn;
 using namespace qcc;
 using namespace securitymgr;
 
-QStatus PolicyGenerator::DefaultPolicy(const std::vector<GuildInfo>& guildInfos,
+QStatus PolicyGenerator::DefaultPolicy(const std::vector<GroupInfo>& groupInfos,
                                        PermissionPolicy& policy)
 {
     QStatus status = ER_OK;
 
-    size_t numGuilds = guildInfos.size();
+    size_t numGroups = groupInfos.size();
 
     // will be deleted by policy
-    PermissionPolicy::Term* terms = new PermissionPolicy::Term[numGuilds];
+    PermissionPolicy::Acl* acls = new PermissionPolicy::Acl[numGroups];
 
-    for (size_t i = 0; i < numGuilds; i++) {
+    for (size_t i = 0; i < numGroups; i++) {
         if (ER_OK !=
-            (status = DefaultGuildPolicyTerm(guildInfos[i].guid,
-                                             guildInfos[i].authority, terms[i]))) {
+            (status = DefaultGroupPolicyAcl(groupInfos[i],
+                                            acls[i]))) {
             break;
         }
     }
 
     if (ER_OK == status) {
-        policy.SetTerms(numGuilds, terms);
+        policy.SetAcls(numGroups, acls);
     } else {
-        delete[] terms;
+        delete[] acls;
     }
 
     return status;
 }
 
-QStatus PolicyGenerator::DefaultGuildPolicyTerm(const GUID128& guildId,
-                                                const ECCPublicKey& authority,
-                                                PermissionPolicy::Term& term)
+QStatus PolicyGenerator::DefaultGroupPolicyAcl(const GroupInfo& group,
+                                               PermissionPolicy::Acl& term)
 {
     QStatus status = ER_OK;
 
     // will be deleted by term
     PermissionPolicy::Rule* rules = new PermissionPolicy::Rule[1];
 
-    if (ER_OK != (status = DefaultGuildPolicyRule(rules[0]))) {
+    if (ER_OK != (status = DefaultGroupPolicyRule(rules[0]))) {
         delete[] rules;
         return status;
     }
 
     // will be deleted by term
     PermissionPolicy::Peer* peers = new PermissionPolicy::Peer[1];
-    peers[0].SetType(PermissionPolicy::Peer::PEER_GUILD);
-    peers[0].SetGuildId(guildId);
+    peers[0].SetType(PermissionPolicy::Peer::PEER_WITH_MEMBERSHIP);
+    peers[0].SetSecurityGroupId(group.guid);
 
     // will be deleted by peer
-    KeyInfoNISTP256* info = new KeyInfoNISTP256();
-    // info->SetKeyId(guildId, guildIdLen);
-    info->SetPublicKey(&authority);
+    KeyInfoNISTP256* info = new KeyInfoNISTP256(group.authority);
     peers[0].SetKeyInfo(info);
     term.SetPeers(1, peers);
     term.SetRules(1, rules);
@@ -77,7 +74,7 @@ QStatus PolicyGenerator::DefaultGuildPolicyTerm(const GUID128& guildId,
     return status;
 }
 
-QStatus PolicyGenerator::DefaultGuildPolicyRule(PermissionPolicy::Rule& rule)
+QStatus PolicyGenerator::DefaultGroupPolicyRule(PermissionPolicy::Rule& rule)
 {
     // will be deleted by rule
     PermissionPolicy::Rule::Member* members = new PermissionPolicy::Rule::Member[1];

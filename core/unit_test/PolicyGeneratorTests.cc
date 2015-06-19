@@ -18,7 +18,7 @@
 
 #include <stdio.h>
 #include <alljoyn/securitymgr/PolicyGenerator.h>
-#include <alljoyn/securitymgr/GuildInfo.h>
+#include <alljoyn/securitymgr/GroupInfo.h>
 #include <qcc/StringUtil.h>
 
 using namespace std;
@@ -29,28 +29,28 @@ using namespace securitymgr;
 TEST(PolicyGeneratorTest, BasicTest) {
     ECCPublicKey publicKey;
     PermissionPolicy pol;
-    GUID128 guildID;
-    qcc::String guildIDString = BytesToHexString(guildID.GetBytes(), GUID128::SIZE);
+    GUID128 groupID;
+    qcc::String groupIDString = BytesToHexString(groupID.GetBytes(), GUID128::SIZE);
 
-    GuildInfo guild1;
-    guild1.guid = guildID;
+    GroupInfo group1;
+    group1.guid = groupID;
 
-    vector<GuildInfo> guilds;
-    guilds.push_back(guild1);
+    vector<GroupInfo> groups;
+    groups.push_back(group1);
 
-    PolicyGenerator::DefaultPolicy(guilds, pol);
+    PolicyGenerator::DefaultPolicy(groups, pol);
     qcc::String policyString = pol.ToString();
-    ASSERT_EQ((size_t)1, pol.GetTermsSize());
+    ASSERT_EQ((size_t)1, pol.GetAclsSize());
 
-    GUID128 guildID2;
-    qcc::String guildID2String = BytesToHexString(guildID2.GetBytes(), GUID128::SIZE);
+    GUID128 groupID2;
+    qcc::String groupID2String = BytesToHexString(groupID2.GetBytes(), GUID128::SIZE);
 
-    GuildInfo guild2;
-    guild2.guid = guildID2;
-    guilds.push_back(guild2);
+    GroupInfo group2;
+    group2.guid = groupID2;
+    groups.push_back(group2);
 
-    PolicyGenerator::DefaultPolicy(guilds, pol);
+    PolicyGenerator::DefaultPolicy(groups, pol);
     policyString = pol.ToString();
 
-    ASSERT_EQ((size_t)2, pol.GetTermsSize());
+    ASSERT_EQ((size_t)2, pol.GetAclsSize());
 }

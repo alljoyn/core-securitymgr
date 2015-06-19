@@ -14,12 +14,10 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef SECINFOLISTENER_H_
-#define SECINFOLISTENER_H_
+#ifndef ALLJOYN_SECMGR_SECINFOLISTENER_H_
+#define ALLJOYN_SECMGR_SECINFOLISTENER_H_
 
 #include <SecurityInfo.h>
-
-#define QCC_MODULE "SEC_MGR"
 
 namespace ajn {
 namespace securitymgr {
@@ -47,5 +45,4 @@ class SecurityInfoListener {
 };
 }
 }
-#undef QCC_MODULE
-#endif /* SECINFOLISTENER_H_ */
+#endif /* ALLJOYN_SECMGR_SECINFOLISTENER_H_ */

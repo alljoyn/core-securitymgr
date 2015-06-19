@@ -15,22 +15,23 @@
  ******************************************************************************/
 
 #include <alljoyn/securitymgr/sqlstorage/SQLStorageFactory.h>
-#include <SQLStorage.h>
 #include <qcc/Environ.h>
 #include <qcc/Debug.h>
-#include "SQLStorageConfig.h"
 
-#ifndef QCC_MODULE
-#define QCC_MODULE "SEC_MGR"
-#endif
+#include "SQLStorage.h"
+#include "SQLStorageConfig.h"
+#include "AJNCaStorage.h"
+#include "UIStorageImpl.h"
+
+#define QCC_MODULE "SEGMGR_STORAGE"
 
 #define HOME_KEY "HOME"
 
 namespace ajn {
 namespace securitymgr {
-Storage* SQLStorageFactory::GetStorage()
+static SQLStorage* GetStorage()
 {
-    Storage* storage;
+    SQLStorage* storage;
     SQLStorageConfig storageConfig;
     qcc::String homePath = qcc::Environ::GetAppEnviron()->Find(HOME_KEY);
     qcc::String storageFilePath = qcc::Environ::GetAppEnviron()->Find(STORAGE_FILEPATH_KEY);
@@ -56,6 +57,32 @@ Storage* SQLStorageFactory::GetStorage()
 
     delete storage;
     return NULL;
+}
+
+QStatus SQLStorageFactory::GetStorages(std::string caName,
+                                       shared_ptr<CaStorage>& caStorage,
+                                       shared_ptr<UIStorage>& storage)
+{
+    SQLStorage* s = GetStorage();
+    if (s == NULL) {
+        return ER_FAIL;
+    }
+    shared_ptr<SQLStorage> localStorage(s);
+    shared_ptr<AJNCaStorage> ca = make_shared<AJNCaStorage>();
+    if (ca != NULL) {
+        QStatus status = ca->Init(caName, localStorage);
+        if (status != ER_OK) {
+            return status;
+        }
+        caStorage.reset();
+        caStorage = shared_ptr<CaStorage>(ca);
+        storage.reset();
+        shared_ptr<UIStorageImpl> wr = shared_ptr<UIStorageImpl>(new UIStorageImpl(ca, localStorage));
+        storage = wr;
+        shared_ptr<StorageListenerHandler> sh = wr;
+        ca->SetStorageListenerHandler(sh);
+    }
+    return ER_OK;
 }
 }
 }

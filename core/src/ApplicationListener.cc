@@ -23,23 +23,16 @@ using namespace std;
 
 namespace ajn {
 namespace securitymgr {
-void ApplicationListener::PrintStateChangeEvent(const ApplicationInfo* old,
-                                                const ApplicationInfo* updated)
+void ApplicationListener::PrintStateChangeEvent(const OnlineApplication* old,
+                                                const OnlineApplication* updated)
 {
-    const ApplicationInfo* info = updated ? updated : old;
+    const OnlineApplication* info = updated ? updated : old;
     cout << "  Application updated:" << endl;
     cout << "  ====================" << endl;
-    cout << "  Application name  : " << info->appName << endl;
-    cout << "  User-defined name : " << info->userDefinedName << endl;
-    cout << "  Hostname          : " << info->deviceName << endl;
     cout << "  Busname           : " << info->busName << endl;
-    cout << "  - claim state     : " <<
-        ToString(old ? old->claimState : ajn::PermissionConfigurator::STATE_UNKNOWN) << " --> "
-         << ToString(updated ? updated->claimState : ajn::PermissionConfigurator::STATE_UNKNOWN)
-         << endl;
-    cout << "  - running state   : "
-         << ToString(old ? old->runningState : STATE_NOT_RUNNING) << " --> "
-         << ToString(updated ? updated->runningState : STATE_NOT_RUNNING) << endl;
+    cout << "  Claim state       : "
+         << (old ? ToString(old->claimState) : "UNKNOWN") << " --> "
+         << (updated ? ToString(updated->claimState) : "UNKNOWN") << endl;
     cout << "  Updates pending   : " << (info->updatesPending ? "true" : "false");
     cout << endl << "> " << flush;
 }

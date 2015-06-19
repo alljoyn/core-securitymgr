@@ -14,13 +14,13 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef TESTUTIL_H_
-#define TESTUTIL_H_
+#ifndef ALLJOYN_SECMGR_TESTUTIL_H_
+#define ALLJOYN_SECMGR_TESTUTIL_H_
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
-#include <alljoyn/securitymgr/ApplicationInfo.h>
-#include <alljoyn/securitymgr/SecurityManagerFactory.h>
+#include <alljoyn/securitymgr/Application.h>
+#include <alljoyn/securitymgr/SecurityAgentFactory.h>
 #include <alljoyn/securitymgr/SyncError.h>
 #include <alljoyn/securitymgr/sqlstorage/SQLStorageFactory.h>
 
@@ -29,6 +29,8 @@
 #include <qcc/Mutex.h>
 #include <qcc/Condition.h>
 #include "Stub.h"
+
+#include <memory>
 
 using namespace ajn::securitymgr;
 using namespace std;
@@ -49,12 +51,11 @@ class TestAboutListener :
                            const MsgArg& objectDescriptionArg,
                            const MsgArg& aboutDataArg)
     {
+        QCC_UNUSED(busName);
         QCC_UNUSED(version);
         QCC_UNUSED(port);
         QCC_UNUSED(objectDescriptionArg);
         QCC_UNUSED(aboutDataArg);
-
-        printf("Found About data @%s\n", busName);
     }
 };
 
@@ -64,15 +65,14 @@ class TestApplicationListener :
     TestApplicationListener(qcc::Condition& _sem,
                             qcc::Mutex& _lock);
 
-    ApplicationInfo _lastAppInfo;
-    bool event;
+    vector<OnlineApplication> events;
 
   private:
     qcc::Condition& sem;
     qcc::Mutex& lock;
 
-    void OnApplicationStateChange(const ApplicationInfo* old,
-                                  const ApplicationInfo* updated);
+    void OnApplicationStateChange(const OnlineApplication* old,
+                                  const OnlineApplication* updated);
 
     void OnSyncError(const SyncError* syncError)
     {
@@ -85,13 +85,11 @@ class TestApplicationListener :
 
 class AutoAccepter :
     public ManifestListener {
-    bool ApproveManifest(const ApplicationInfo& appInfo,
-                         const PermissionPolicy::Rule* manifestRules,
-                         const size_t manifestRulesCount)
+    bool ApproveManifest(const OnlineApplication& app,
+                         const Manifest& manifest)
     {
-        QCC_UNUSED(appInfo);
-        QCC_UNUSED(manifestRules);
-        QCC_UNUSED(manifestRulesCount);
+        QCC_UNUSED(app);
+        QCC_UNUSED(manifest);
 
         return true;
     }
@@ -114,10 +112,11 @@ class BasicTest :
 
   public:
 
-    SecurityManager* secMgr;
+    SecurityAgent* secMgr;
     BusAttachment* ba;
-    Storage* storage;
-    ApplicationInfo lastAppInfo;
+    shared_ptr<UIStorage> storage;
+    shared_ptr<CaStorage> ca;
+    OnlineApplication lastAppInfo;
     AutoAccepter aa;
 
     BasicTest();
@@ -125,9 +124,12 @@ class BasicTest :
     /* When updatesPending is -1, we will just ignore checking the updatesPending flag,
      * otherwise it acts as a bool that needs to be checked/waited-for akin to states.
      * */
-    bool WaitForState(ajn::PermissionConfigurator::ClaimableState newClaimState,
+    bool WaitForState(ajn::PermissionConfigurator::ApplicationState newClaimState,
                       ajn::securitymgr::ApplicationRunningState newRunningState,
                       const int updatesPending = -1);
+
+    bool MatchesRunningState(const OnlineApplication& app,
+                             ajn::securitymgr::ApplicationRunningState runningState);
 };
 
 class TestClaimListener :
@@ -176,13 +178,13 @@ class ClaimedTest :
         stub = new Stub(tcl);
         /* Open claim window */
         stub->OpenClaimWindow();
-        ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
+        ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMABLE, ajn::securitymgr::STATE_RUNNING));
         /* Claim ! */
-        idInfo.guid = lastAppInfo.peerID;
+        idInfo.guid = GUID128(lastAppInfo.aki);
         idInfo.name = "MyTest ID Name";
-        secMgr->StoreIdentity(idInfo);
+        storage->StoreIdentity(idInfo);
         secMgr->Claim(lastAppInfo, idInfo);
-        ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::STATE_CLAIMED, ajn::securitymgr::STATE_RUNNING));
+        ASSERT_TRUE(WaitForState(ajn::PermissionConfigurator::CLAIMED, ajn::securitymgr::STATE_RUNNING));
         stub->SetDSASecurity(true);
         ASSERT_EQ(ER_OK, secMgr->GetApplication(lastAppInfo));
     }
@@ -210,4 +212,4 @@ class ClaimedTest :
     }
 };
 }
-#endif /* TESTUTIL_H_ */
+#endif /* ALLJOYN_SECMGR_TESTUTIL_H_ */

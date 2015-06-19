@@ -14,8 +14,8 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef SAMPLE_DOOR_COMMON_H_
-#define SAMPLE_DOOR_COMMON_H_
+#ifndef ALLJOYN_SECMGR_SAMPLE_DOOR_COMMON_H_
+#define ALLJOYN_SECMGR_SAMPLE_DOOR_COMMON_H_
 
 #define DOOR_INTF_SECURE 1
 
@@ -141,4 +141,4 @@ class DoorCommon {
 }
 }
 
-#endif /* SAMPLE_DOOR_COMMON_H_ */
+#endif /* ALLJOYN_SECMGR_SAMPLE_DOOR_COMMON_H_ */

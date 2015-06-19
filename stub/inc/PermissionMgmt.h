@@ -84,7 +84,7 @@ class PermissionMgmt :
     std::map<GUID128, qcc::String> memberships; //guildId, certificate (in PEM)
     qcc::String pemIdentityCertificate;
     ClaimListener* cl;
-    ajn::PermissionConfigurator::ClaimableState claimableState;
+    ajn::PermissionConfigurator::ApplicationState claimableState;
     void* ctx;
     const InterfaceDescription::Member* unsecInfoSignalMember;
     PermissionPolicy::Rule* manifestRules;
@@ -138,7 +138,7 @@ class PermissionMgmt :
     /* TODO: add a function that allows the application to reset the claimable state
      * and maybe even the public keys and certificates */
 
-    ajn::PermissionConfigurator::ClaimableState GetClaimableState() const;
+    ajn::PermissionConfigurator::ApplicationState GetClaimableState() const;
 
     std::vector<qcc::ECCPublicKey*> GetRoTKeys() const;
 

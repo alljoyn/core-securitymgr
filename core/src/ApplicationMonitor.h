@@ -14,8 +14,8 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef APPLICATIONMONITOR_H_
-#define APPLICATIONMONITOR_H_
+#ifndef ALLJOYN_SECMGR_APPLICATIONMONITOR_H_
+#define ALLJOYN_SECMGR_APPLICATIONMONITOR_H_
 
 #include <vector>
 #include <map>
@@ -23,7 +23,7 @@
 #include <SecurityInfoListener.h>
 #include <alljoyn/BusAttachment.h>
 #include <alljoyn/AutoPinger.h>
-#include <alljoyn/MessageReceiver.h>
+#include <alljoyn/ApplicationStateListener.h>
 #include <qcc/String.h>
 #include <qcc/GUID.h>
 
@@ -31,33 +31,27 @@
 
 #include <qcc/Debug.h>
 
-#define QCC_MODULE "SEC_MGR"
-
 namespace ajn {
 namespace securitymgr {
 class ApplicationMonitor :
-    public ajn::PingListener,
-    public ajn::MessageReceiver {
+    public PingListener,
+    public ApplicationStateListener {
   private:
-    std::map<qcc::String, SecurityInfo> applications;     /* key=busname of app, value = busName */
-    std::vector<SecurityInfoListener*> listeners; /*Ownership lies with the application that asks for listener registration*/
-    ajn::AutoPinger* pinger;
-    ajn::BusAttachment* busAttachment;
+    std::map<qcc::String, SecurityInfo> applications; /* key = busName */
+    std::vector<SecurityInfoListener*> listeners; /* no ownership */
+    AutoPinger* pinger;
+    BusAttachment* busAttachment;
     mutable qcc::Mutex securityListenersMutex;
     mutable qcc::Mutex appsMutex;
 
     ApplicationMonitor();
-    ApplicationMonitor(ajn::BusAttachment* ba,
-                       qcc::String signalIfn);
+    ApplicationMonitor(BusAttachment* ba);
 
     void operator=(ApplicationMonitor const&) { }
 
-    QStatus UnmarshalSecuritySignal(Message& msg,
-                                    SecurityInfo& secInfo);
-
-    void StateChangedSignalHandler(const InterfaceDescription::Member* member,
-                                   const char* sourcePath,
-                                   Message& msg);
+    void State(const char* busName,
+               const qcc::KeyInfoNISTP256& publicKeyInfo,
+               PermissionConfigurator::ApplicationState state);
 
     void DestinationLost(const qcc::String& group,
                          const qcc::String& destination);
@@ -69,14 +63,13 @@ class ApplicationMonitor :
                                      const SecurityInfo* newSecInfo);
 
   public:
-    static ApplicationMonitor* GetApplicationMonitor(ajn::BusAttachment* ba, qcc::String signalIfn)
+    static ApplicationMonitor* GetApplicationMonitor(BusAttachment* ba)
     {
-        return new ApplicationMonitor(ba, signalIfn);
+        return new ApplicationMonitor(ba);
     }
 
     ~ApplicationMonitor();
 
-    /* Get a list of all aboutOnlyApplications which currently have been discovered */
     std::vector<SecurityInfo> GetApplications() const;
 
     QStatus GetApplication(SecurityInfo& secInfo) const;
@@ -87,5 +80,4 @@ class ApplicationMonitor :
 };
 }
 }
-#undef QCC_MODULE
-#endif /* APPLICATIONLISTENER_H_ */
+#endif /* ALLJOYN_SECMGR_APPLICATIONMONITOR_H_ */

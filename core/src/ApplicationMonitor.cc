@@ -15,185 +15,71 @@
  ******************************************************************************/
 
 #include <alljoyn/securitymgr/ApplicationState.h>
-#include <alljoyn/BusAttachment.h>
 
 #include "ApplicationMonitor.h"
-#include "SecurityManagerImpl.h"
-#include "Common.h"
+#include "KeyInfoHelper.h"
 
 #include <algorithm>
 #include <iostream>
 
-#include <SecLibDef.h>
-
 #include <vector>
 #include <qcc/Debug.h>
 
-#define QCC_MODULE "SEC_MGR"
+#define QCC_MODULE "SEGMGR_AGENT"
 
-#define PM_NOTIF_IFN "org.allseen.Security.PermissionMgmt.Notification"
-#define PM_NOTIF_SIG "qa(yv)ya(yv)ua(ayay)"
-#define PM_NOTIF_ARGS "version,publicKeyInfo,claimableState,trustAnchors,serialNumber,memberships"
 #define PM_NOTIF_MEMBER "NotifyConfig"
-
-#define PM_STUB_NOTIF_IFN "org.allseen.Security.PermissionMgmt.Stub.Notification"
+#define AUTOPING_GROUPNAME (qcc::String("AMPingGroup"))
 
 using namespace ajn;
 using namespace ajn::securitymgr;
 
-ApplicationMonitor::ApplicationMonitor(ajn::BusAttachment* ba,
-                                       qcc::String notifIfn) :
+ApplicationMonitor::ApplicationMonitor(ajn::BusAttachment* ba) :
     pinger(new AutoPinger(*ba)), busAttachment(ba)
 {
     QStatus status = ER_FAIL;
 
-    do {
-        if (NULL == busAttachment) {
-            QCC_LogError(status, ("NULL busAttachment !"));
-            return;
-        }
+    if (NULL == busAttachment) {
+        QCC_LogError(status, ("NULL busAttachment !"));
+        return;
+    }
 
-        if (pinger == NULL) {
-            QCC_LogError(status, ("Could not get a pinger !"));
-            return;
-        }
-        pinger->AddPingGroup(qcc::String(AUTOPING_GROUPNAME), *this, 5);
+    if (NULL == pinger) {
+        QCC_LogError(status, ("NULL pinger !"));
+        return;
+    }
+    pinger->AddPingGroup(qcc::String(AUTOPING_GROUPNAME), *this, 5);
 
-        // TODO: move stub code outside production code
-        InterfaceDescription* stubIntf;
-        status = busAttachment->CreateInterface(PM_STUB_NOTIF_IFN, stubIntf);
-        if (ER_OK != status) {
-            QCC_LogError(status, ("Failed to create interface '%s' on securitymgr bus attachment",
-                                  PM_STUB_NOTIF_IFN));
-            return;
-        }
-        stubIntf->AddSignal(PM_NOTIF_MEMBER, PM_NOTIF_SIG, PM_NOTIF_ARGS, 0);
-        stubIntf->Activate();
-        // TODO: end of todo
-
-        const InterfaceDescription* intf = busAttachment->GetInterface(notifIfn.c_str());
-        if (NULL == intf) {
-            QCC_LogError(status, ("Failed to get interface '%s' on securitymgr bus attachment",
-                                  notifIfn.c_str()));
-            return;
-        }
-
-        status = busAttachment->RegisterSignalHandler(
-            this, static_cast<MessageReceiver::SignalHandler>(&ApplicationMonitor::StateChangedSignalHandler),
-            intf->GetMember(PM_NOTIF_MEMBER), NULL);
-        if (ER_OK != status) {
-            QCC_LogError(status, ("Failed to register a security signal handler."));
-            break;
-        }
-
-        qcc::String matchRule("type='signal',interface='");
-        matchRule.append(notifIfn);
-        matchRule.append("',member='" PM_NOTIF_MEMBER "',sessionless='t'");
-        QCC_DbgPrintf(("matchrule = %s", matchRule.c_str()));
-        status = busAttachment->AddMatch(matchRule.c_str());
-        if (ER_OK != status) {
-            QCC_LogError(status, ("Failed to add match rule for security info signal."));
-            break;
-        }
-    } while (0);
+    busAttachment->RegisterApplicationStateListener(*this);
+    busAttachment->AddApplicationStateRule();
 }
 
 ApplicationMonitor::~ApplicationMonitor()
 {
+    busAttachment->RemoveApplicationStateRule();
+    busAttachment->UnregisterApplicationStateListener(*this);
     delete pinger;
 }
 
-QStatus ApplicationMonitor::UnmarshalSecuritySignal(Message& msg, SecurityInfo& info)
+void ApplicationMonitor::State(const char* busName,
+                               const qcc::KeyInfoNISTP256& publicKeyInfo,
+                               PermissionConfigurator::ApplicationState state)
 {
-    MsgArg* keyArrayArg;
-    size_t keyArrayLen = 0;
-    QStatus status = msg->GetArg(1)->Get("a(yv)", &keyArrayLen, &keyArrayArg);
-    if (ER_OK != status) {
-        QCC_LogError(status, ("Failed to retrieve public keys."));
-        return status;
-    }
-
-    if (keyArrayLen != 1) {
-        QCC_LogError(status, ("Wrong number of keys public keys (%d).", keyArrayLen));
-        return ER_FAIL;
-    }
-
-    if (ER_OK != (status = SecurityManagerImpl::UnmarshalPublicKey(&keyArrayArg[0], info.publicKey))) {
-        QCC_LogError(status, ("Unmarshalling to ECCPublicKey struct failed"));
-        return status;
-    }
-
-    uint8_t claimableState;
-    if (ER_OK != (status = msg->GetArg(2)->Get("y", &claimableState))) {
-        QCC_LogError(status, ("Failed to unmarshal claimable state."));
-        return status;
-    }
-    info.claimState = (ajn::PermissionConfigurator::ClaimableState)claimableState;
-    QCC_DbgPrintf(("claimState = %s", ToString(info.claimState)));
-
-    MsgArg* rotArrayArg;
-    size_t rotArrayLen = 0;
-    if (ER_OK != (status = msg->GetArg(3)->Get("a(yv)", &rotArrayLen, &rotArrayArg))) {
-        QCC_LogError(status, ("Failed to unmarshal array of RoTs."));
-        return status;
-    }
-    QCC_DbgPrintf(("numberOfRoTs = %i", rotArrayLen));
-
-    if (rotArrayLen > 0) {
-        for (size_t i = 0; i < rotArrayLen; i++) {
-            uint8_t rotUsage;
-            MsgArg* rotArg;
-            if (ER_OK != (status = rotArrayArg[i].Get("(yv)", &rotUsage, &rotArg))) {
-                QCC_LogError(status, ("Failed to unmarshal array of RoT %i.", i));
-            }
-
-            ECCPublicKey rot;
-            if (ER_OK != (status = SecurityManagerImpl::UnmarshalPublicKey(rotArg, rot))) {
-                QCC_LogError(status, ("Failed to unmarshal array of RoT %i.", i));
-                return status;
-            }
-            info.rootsOfTrust.push_back(rot);
-        }
-    }
-
-    if (ER_OK != (status = msg->GetArg(4)->Get("u", &(info.policySerialNum)))) {
-        QCC_LogError(status, ("Failed to unmarshal policy serial number."));
-        return status;
-    }
-    QCC_DbgPrintf(("policySerialNumber = %d", info.policySerialNum));
-
-    info.runningState = STATE_RUNNING;
-    QCC_DbgPrintf(("runningState = %s", ToString(info.runningState)));
-
-    return status;
-}
-
-void ApplicationMonitor::StateChangedSignalHandler(const InterfaceDescription::Member* member,
-                                                   const char* sourcePath,
-                                                   Message& msg)
-{
-    QCC_UNUSED(sourcePath);
-    QCC_UNUSED(member);
-
-    QCC_DbgPrintf(("Received NotifyConfig signal!!!"));
-
-    QStatus status = ER_OK;
+    QCC_DbgPrintf(("Received ApplicationState !!!"));
 
     SecurityInfo info;
-    info.busName = qcc::String(msg->GetSender());
-    QCC_DbgPrintf(("busname = %s", info.busName.c_str()));
+    info.busName = qcc::String(busName);
+    info.applicationState = state;
+    info.publicKey = *(publicKeyInfo.GetPublicKey());
 
-    qcc::String localBusName = busAttachment->GetUniqueName();
     // ignore signals of local security manager
+    qcc::String localBusName = busAttachment->GetUniqueName();
     if (info.busName == localBusName) {
-        QCC_DbgPrintf(("Ignoring NotifyConfig signal of local Security Manager."));
+        QCC_DbgPrintf(("Ignoring ApplicationState of local Security Manager."));
         return;
     }
 
-    if (ER_OK != (status = UnmarshalSecuritySignal(msg, info))) {
-        QCC_LogError(status, ("Failed to unmarshal NotifyConfig signal."));
-        return;
-    }
+    QCC_DbgPrintf(("busName = %s", info.busName.c_str()));
+    QCC_DbgPrintf(("applicationState = %s", ToString(state)));
 
     appsMutex.Lock(__FILE__, __LINE__);
 
@@ -209,10 +95,13 @@ void ApplicationMonitor::StateChangedSignalHandler(const InterfaceDescription::M
         applications[info.busName] = info;
         appsMutex.Unlock(__FILE__, __LINE__);
 
-        if (ER_OK != (status = pinger->AddDestination(AUTOPING_GROUPNAME, info.busName))) {
+        //Intentional sleep, see: ASACORE-1493
+        qcc::Sleep(500);
+
+        QStatus status = pinger->AddDestination(AUTOPING_GROUPNAME, info.busName);
+        if (ER_OK != status) {
             QCC_LogError(status, ("Failed to add destination to AutoPinger."));
         }
-        QCC_DbgPrintf(("Added destination %s", info.busName.c_str()));
 
         NotifySecurityInfoListeners(NULL, &info);
     }
@@ -226,8 +115,8 @@ std::vector<SecurityInfo> ApplicationMonitor::GetApplications() const
         std::vector<SecurityInfo> apps;
         std::map<qcc::String, SecurityInfo>::const_iterator it = applications.begin();
         for (; it != applications.end(); ++it) {
-            const SecurityInfo& appInfo = it->second;
-            apps.push_back(appInfo);
+            const SecurityInfo& app = it->second;
+            apps.push_back(app);
         }
         appsMutex.Unlock(__FILE__, __LINE__);
         return apps;
@@ -303,28 +192,7 @@ void ApplicationMonitor::DestinationLost(const qcc::String& group, const qcc::St
 void ApplicationMonitor::DestinationFound(const qcc::String& group, const qcc::String& destination)
 {
     QCC_UNUSED(group);
-
-    QCC_DbgPrintf(("DestinationFound %s\n", destination.data()));
-    appsMutex.Lock(__FILE__, __LINE__);
-
-    std::map<qcc::String, SecurityInfo>::iterator it = applications.find(destination);
-
-    if (it != applications.end()) {
-        /* we already know this application */
-        if (it->second.runningState != STATE_RUNNING) {
-            SecurityInfo old = it->second;
-            it->second.runningState = STATE_RUNNING;
-            SecurityInfo newSecInfo = it->second;
-            appsMutex.Unlock(__FILE__, __LINE__);
-            NotifySecurityInfoListeners(&old, &newSecInfo);
-        } else {
-            appsMutex.Unlock(__FILE__, __LINE__);
-        }
-    } else {
-        appsMutex.Unlock(__FILE__, __LINE__);
-        /* We are monitoring an app not in the list. Remove it. */
-        pinger->RemoveDestination(AUTOPING_GROUPNAME, destination);
-    }
+    QCC_UNUSED(destination);
 }
 
 #undef QCC_MODULE

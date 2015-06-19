@@ -1,5 +1,5 @@
-#ifndef SECMGR_POLICY_H_
-#define SECMGR_POLICY_H_
+#ifndef ALLJOYN_SECMGR_POLICYGENERATOR_H_
+#define ALLJOYN_SECMGR_POLICYGENERATOR_H_
 
 /******************************************************************************
  * Copyright (c) AllSeen Alliance. All rights reserved.
@@ -25,32 +25,33 @@
 #include <alljoyn/PermissionPolicy.h>
 #include <alljoyn/Status.h>
 
-#include <alljoyn/securitymgr/GuildInfo.h>
+#include <alljoyn/securitymgr/GroupInfo.h>
 
 namespace ajn {
 namespace securitymgr {
 class PolicyGenerator {
   public:
     /*
-     * Generates a default policy in which any member of the specified guilds can
+     * Generates a default policy in which any member of the specified groups can
      * provide any interface to this application and can modify any interface
      * provided by this application.
      *
-     * \param[in]  guildInfos  the guilds in the generated policy
+     * \param[in]  groupInfos  the groups in the generated policy
      * \param[out] policy      the generated policy
      *
+     * \return ER_OK           if policy was generated successfully
+     * \return others          on failure
      */
-    static QStatus DefaultPolicy(const std::vector<GuildInfo>& guildInfos,
+    static QStatus DefaultPolicy(const std::vector<GroupInfo>& groupInfos,
                                  PermissionPolicy& policy);
 
   private:
-    static QStatus DefaultGuildPolicyTerm(const qcc::GUID128& guild,
-                                          const qcc::ECCPublicKey& authority,
-                                          PermissionPolicy::Term& term);
+    static QStatus DefaultGroupPolicyAcl(const GroupInfo& group,
+                                         PermissionPolicy::Acl& acl);
 
-    static QStatus DefaultGuildPolicyRule(PermissionPolicy::Rule& rule);
+    static QStatus DefaultGroupPolicyRule(PermissionPolicy::Rule& rule);
 };
 }
 }
 
-#endif
+#endif  /* ALLJOYN_SECMGR_POLICYGENERATOR_H_ */

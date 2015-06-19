@@ -44,14 +44,14 @@ TEST_F(IdentityManipulationRobustnessTests, FailedBasicIdentityOperations) {
 
     identityInfo.name = "Wrong Identity";
 
-    ASSERT_EQ(secMgr->GetIdentity(identityInfo), ER_END_OF_DATA);
-    ASSERT_NE(secMgr->RemoveIdentity(identityInfo), ER_OK);
-    ASSERT_EQ(secMgr->GetIdentities(empty), ER_OK);
+    ASSERT_EQ(storage->GetIdentity(identityInfo), ER_END_OF_DATA);
+    ASSERT_NE(storage->RemoveIdentity(identityInfo), ER_OK);
+    ASSERT_EQ(storage->GetIdentities(empty), ER_OK);
     ASSERT_TRUE(empty.empty());
 
     identityInfo.name = "Dummy Identity";
 
-    ASSERT_EQ(secMgr->StoreIdentity(identityInfo), ER_OK);
+    ASSERT_EQ(storage->StoreIdentity(identityInfo), ER_OK);
 }
 
 /**
@@ -72,16 +72,16 @@ TEST_F(IdentityManipulationRobustnessTests, IdentityUpdate) {
 
     identityInfo.name = name;
 
-    ASSERT_EQ(secMgr->StoreIdentity(identityInfo), ER_OK);
-    ASSERT_EQ(secMgr->GetIdentity(identityInfo), ER_OK);
+    ASSERT_EQ(storage->StoreIdentity(identityInfo), ER_OK);
+    ASSERT_EQ(storage->GetIdentity(identityInfo), ER_OK);
 
     name += " - updated";
     desc += " - updated";
 
     identityInfo.name = name;
 
-    ASSERT_EQ(secMgr->StoreIdentity(identityInfo), ER_OK);
-    ASSERT_EQ(secMgr->GetIdentity(identityInfo), ER_OK);
+    ASSERT_EQ(storage->StoreIdentity(identityInfo), ER_OK);
+    ASSERT_EQ(storage->GetIdentity(identityInfo), ER_OK);
 
     ASSERT_EQ(identityInfo.name, name);
 }

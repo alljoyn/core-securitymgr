@@ -14,30 +14,31 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef MANAGEDAPPINFO_H_
-#define MANAGEDAPPINFO_H_
+#ifndef APPLICATIONMETADATA_H_
+#define APPLICATIONMETADATA_H_
 
-#include <qcc/String.h>
-#include <qcc/CryptoECC.h>
-
-#define QCC_MODULE "SEC_MGR"
-
-namespace ajn {
-namespace securitymgr {
 /*
- * \brief Represents any application info that is persisted in local storage.
+ * \brief ApplicationMetaData should include extra information that could be fetched from About.
  */
-struct ManagedApplicationInfo {
-    qcc::ECCPublicKey publicKey;
+struct ApplicationMetaData {
     qcc::String userDefinedName;
     qcc::String deviceName;
     qcc::String appName;
-    qcc::String peerID;
-    qcc::String manifest;
-    qcc::String policy;
-    bool updatesPending;
+
+    bool operator==(const ApplicationMetaData& rhs) const
+    {
+        if (userDefinedName != rhs.userDefinedName) {
+            return false;
+        }
+        if (deviceName != rhs.deviceName) {
+            return false;
+        }
+        if (appName != rhs.appName) {
+            return false;
+        }
+
+        return true;
+    }
 };
-}
-}
-#undef QCC_MODULE
-#endif /* MANAGEDAPPINFO_H_ */
+
+#endif /* APPLICATIONMETADATA_H_ */

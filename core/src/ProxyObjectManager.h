@@ -13,12 +13,14 @@
  *    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
-#ifndef PROXYOBJECTMANAGER_H_
-#define PROXYOBJECTMANAGER_H_
+#ifndef ALLJOYN_SECMGR_PROXYOBJECTMANAGER_H_
+#define ALLJOYN_SECMGR_PROXYOBJECTMANAGER_H_
 
 #include <map>
 
-#include <alljoyn/securitymgr/ApplicationInfo.h>
+#include <alljoyn/securitymgr/GroupInfo.h>
+#include <alljoyn/securitymgr/Application.h>
+#include <alljoyn/securitymgr/Manifest.h>
 
 #include <qcc/String.h>
 #include <qcc/Mutex.h>
@@ -26,7 +28,7 @@
 #include <alljoyn/Status.h>
 #include <alljoyn/Session.h>
 #include <alljoyn/BusAttachment.h>
-#include <alljoyn/PermissionMgmtProxy.h>
+#include <alljoyn/SecurityApplicationProxy.h>
 
 #define KEYX_ECDHE_NULL "ALLJOYN_ECDHE_NULL"
 #define ECDHE_KEYX "ALLJOYN_ECDHE_ECDSA"
@@ -47,30 +49,40 @@ class ProxyObjectManager :
 
     ~ProxyObjectManager();
 
-    QStatus MethodCall(const ApplicationInfo app,
-                       const qcc::String methodName,
-                       const MsgArg* args,
-                       const size_t numArgs,
-                       Message& replyMsg);
-
-    QStatus Claim(const ApplicationInfo& app,
+    QStatus Claim(const OnlineApplication& app,
                   qcc::KeyInfoNISTP256& certificateAuthority,
-                  qcc::GUID128& adminGroupId,
-                  qcc::KeyInfoNISTP256& adminGroup,
+                  GroupInfo& adminGroup,
                   qcc::IdentityCertificate* identityCertChain,
                   size_t identityCertChainSize,
                   PermissionPolicy::Rule* manifest,
                   size_t manifestSize);
 
-    QStatus GetIdentity(const ApplicationInfo& app,
-                        qcc::IdentityCertificate** certChain,
-                        size_t* certChainSize);
+    QStatus GetIdentity(const OnlineApplication& app,
+                        qcc::IdentityCertificate* cert);
 
-    QStatus InstallIdentity(const ApplicationInfo& app,
-                            qcc::IdentityCertificate* certChain,
-                            size_t certChainSize,
-                            const PermissionPolicy::Rule* manifest,
-                            size_t manifestSize);
+    QStatus UpdateIdentity(const OnlineApplication& app,
+                           qcc::IdentityCertificate* certChain,
+                           size_t certChainSize,
+                           const Manifest& mf);
+
+    QStatus InstallMembership(const OnlineApplication& app,
+                              const qcc::MembershipCertificate* certificateChain,
+                              size_t certificateChainSize);
+
+    QStatus UpdatePolicy(const OnlineApplication& app,
+                         const PermissionPolicy& policy);
+
+    QStatus GetManifestTemplate(const OnlineApplication& app,
+                                Manifest& mf);
+
+    QStatus Reset(const OnlineApplication& app);
+
+    QStatus GetPolicy(const OnlineApplication& app,
+                      PermissionPolicy& policy);
+
+    QStatus RemoveMembership(const OnlineApplication& app,
+                             const qcc::String& serial,
+                             const qcc::KeyInfoNISTP256& issuerKeyInfo);
 
     static ajn::AuthListener* listener;
 
@@ -79,15 +91,9 @@ class ProxyObjectManager :
     qcc::Mutex lock;
     ajn::BusAttachment* bus;
 
-    const char* interfaceName;
-    std::map<qcc::String, SessionType> methodToSessionType;
-
     /* ajn::SessionListener */
     virtual void SessionLost(ajn::SessionId sessionId,
                              SessionLostReason reason);
-
-    QStatus GetStatus(const QStatus status,
-                      const Message& msg) const;
 
     /**
      * \brief Ask the ProxyObjectManager to provide a ProxyBusObject to given
@@ -99,17 +105,17 @@ class ProxyObjectManager :
      * \param[out] remoteObject the ProxyBusObject will be stored in this
      * pointer on success.
      */
-    QStatus GetProxyObject(const ApplicationInfo appInfo,
+    QStatus GetProxyObject(const OnlineApplication app,
                            SessionType type,
-                           ajn::PermissionMgmtProxy** remoteObject);
+                           ajn::SecurityApplicationProxy** remoteObject);
 
     /**
      * \brief releases the remoteObject.
      * \param[in] the object to be released.
      */
-    QStatus ReleaseProxyObject(ajn::PermissionMgmtProxy* remoteObject);
+    QStatus ReleaseProxyObject(ajn::SecurityApplicationProxy* remoteObject);
 };
 }
 }
 
-#endif /* PROXYOBJECTMANAGER_H_ */
+#endif /* ALLJOYN_SECMGR_PROXYOBJECTMANAGER_H_ */

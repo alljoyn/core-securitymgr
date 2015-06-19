@@ -14,14 +14,13 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef APPLICATIONLISTENER_H_
-#define APPLICATIONLISTENER_H_
+#ifndef ALLJOYN_SECMGR_APPLICATIONLISTENER_H_
+#define ALLJOYN_SECMGR_APPLICATIONLISTENER_H_
 
-#include <alljoyn/securitymgr/ApplicationInfo.h>
+#include <alljoyn/securitymgr/Application.h>
 #include <alljoyn/securitymgr/SyncError.h>
 
 #include <qcc/Debug.h>
-#define QCC_MODULE "SEC_MGR"
 
 namespace ajn {
 namespace securitymgr {
@@ -32,11 +31,11 @@ class ApplicationListener {
      * been detected. The execution of this method should be short, as all
      * registered listeners will be called synchronously.
      *
-     * \param[in] oldAppInfo   the previously known information of this app or NULL if no info was known.
-     * \param[in] newAppInfo   the new information of this app or NULL when the security manager is no longer tracking the application.
+     * \param[in] oldApp   the previously known information of this app or NULL if no info was known.
+     * \param[in] newApp   the new information of this app or NULL when the security manager is no longer tracking the application.
      */
-    virtual void OnApplicationStateChange(const ApplicationInfo* oldAppInfo,
-                                          const ApplicationInfo* newAppInfo) = 0;
+    virtual void OnApplicationStateChange(const OnlineApplication* oldApp,
+                                          const OnlineApplication* newApp) = 0;
 
     /**
      * \brief Callback that is triggered when an application could not be
@@ -48,7 +47,7 @@ class ApplicationListener {
      */
     virtual void OnSyncError(const SyncError* syncError) = 0;
 
-    friend class SecurityManagerImpl;
+    friend class SecurityAgentImpl;
 
   protected:
     ApplicationListener() { };
@@ -56,10 +55,9 @@ class ApplicationListener {
   public:
     virtual ~ApplicationListener() { };
 
-    static void PrintStateChangeEvent(const ApplicationInfo* oldAppInfo,
-                                      const ApplicationInfo* newAppInfo);
+    static void PrintStateChangeEvent(const OnlineApplication* oldApp,
+                                      const OnlineApplication* newApp);
 };
 }
 }
-#undef QCC_MODULE
-#endif /* APPLICATIONLISTENER_H_ */
+#endif /* ALLJOYN_SECMGR_APPLICATIONLISTENER_H_ */

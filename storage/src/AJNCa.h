@@ -14,13 +14,53 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef SECLIBDEF_H_
-#define SECLIBDEF_H_
+#ifndef ALLJOYN_SECMGR_STORAGE_AJNCA_H_
+#define ALLJOYN_SECMGR_STORAGE_AJNCA_H_
 
-#define AUTOPING_GROUPNAME (qcc::String("AMPingGroup"))
+#include <KeyStore.h>
 
-#define MSG_REPLY_TIMEOUT 5000
+#include <string>
+#include <qcc/CryptoECC.h>
+#include <qcc/CertificateECC.h>
+#include <alljoyn/Status.h>
 
-#define MNGT_SERVICE_PORT 101
+using namespace qcc;
+using namespace std;
 
-#endif /* SECLIBDEF_H_ */
+namespace ajn {
+namespace securitymgr {
+class AJNCa {
+  public:
+    AJNCa() : store(NULL)
+    {
+    };
+
+    ~AJNCa()
+    {
+        delete store;
+    }
+
+    QStatus Reset();
+
+    QStatus Init(string storeName);
+
+    QStatus GetDSAPublicKey(ECCPublicKey& publicKey) const;
+
+    QStatus GetDSAPrivateKey(ECCPrivateKey& privateKey) const;
+
+    QStatus SignCertificate(CertificateX509& certificate) const;
+
+  private:
+    static QStatus GetLocalKey(KeyBlob::Type keyType,
+                               KeyStore::Key& key);
+
+    QStatus StoreKey(const uint8_t* data,
+                     size_t dataSize,
+                     KeyBlob::Type keyType);
+
+    KeyStore* store;
+};
+}
+}
+
+#endif /* ALLJOYN_SECMGR_STORAGE_AJNCA_H_ */

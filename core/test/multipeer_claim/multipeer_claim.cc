@@ -25,7 +25,7 @@
 #include <alljoyn/securitymgr/SecurityManagerFactory.h>
 #include <alljoyn/securitymgr/GuildInfo.h>
 #include <alljoyn/securitymgr/IdentityInfo.h>
-#include <alljoyn/securitymgr/ApplicationInfo.h>
+#include <alljoyn/securitymgr/Application.h>
 #include <alljoyn/securitymgr/PolicyGenerator.h>
 #include <alljoyn/securitymgr/sqlstorage/SQLStorageFactory.h>
 
@@ -40,7 +40,7 @@ using namespace std;
 
 class AutoAccepter :
     public ManifestListener {
-    bool ApproveManifest(const ApplicationInfo& appInfo,
+    bool ApproveManifest(const Application& app,
                          const PermissionPolicy::Rule* manifestRules,
                          const size_t manifestRulesCount)
     {
@@ -229,7 +229,7 @@ class TestApplicationListener :
     }
 
     bool WaitFor(ApplicationRunningState runningState,
-                 ajn::PermissionConfigurator::ClaimableState claimState,
+                 ajn::PermissionConfigurator::ApplicationState claimState,
                  size_t count)
     {
         std::unique_lock<std::mutex> lk(m);
@@ -241,20 +241,20 @@ class TestApplicationListener :
     }
 
   private:
-    map<qcc::String, ApplicationInfo> appInfo;
+    map<qcc::String, Application> app;
     std::mutex m;
     std::condition_variable cv;
 
     bool CheckPredicateLocked(ApplicationRunningState runningState,
-                              ajn::PermissionConfigurator::ClaimableState claimState,
+                              ajn::PermissionConfigurator::ApplicationState claimState,
                               size_t count) const
     {
-        if (appInfo.size() != count) {
-            cout << "Not enough peers" << appInfo.size() << " != " << count << endl;
+        if (app.size() != count) {
+            cout << "Not enough peers" << app.size() << " != " << count << endl;
             return false;
         }
 
-        for (pair<qcc::String, ApplicationInfo> businfo : appInfo) {
+        for (pair<qcc::String, Application> businfo : app) {
             if (businfo.second.runningState != runningState || businfo.second.claimState != claimState) {
                 cout << "Wrong states for " << businfo.second.busName << businfo.second.runningState << " != " <<
                     runningState << ", " <<  businfo.second.claimState << " != " << claimState << endl;
@@ -265,14 +265,14 @@ class TestApplicationListener :
         return true;
     }
 
-    void OnApplicationStateChange(const ApplicationInfo* old,
-                                  const ApplicationInfo* updated)
+    void OnApplicationStateChange(const OnlineApplication* old,
+                                  const OnlineApplication* updated)
     {
         ApplicationListener::PrintStateChangeEvent(old, updated);
-        const ApplicationInfo* info = updated ? updated : old;
+        const Application* info = updated ? updated : old;
         std::unique_lock<std::mutex> lk(m);
-        appInfo[updated->busName] = *info;
-        cout << "[Boss] Event peer count = " << appInfo.size() << endl;
+        app[updated->busName] = *info;
+        cout << "[Boss] Event peer count = " << app.size() << endl;
         cv.notify_one();
     }
 
@@ -325,20 +325,20 @@ static int be_secmgr(size_t peers)
         secMgr->RegisterApplicationListener(&tal);
 
         cout << "Waiting for peers to become claimable " << endl;
-        if (tal.WaitFor(STATE_RUNNING, ajn::PermissionConfigurator::STATE_CLAIMABLE, peers) == false) {
+        if (tal.WaitFor(STATE_RUNNING, ajn::PermissionConfigurator::CLAIMABLE, peers) == false) {
             break;
         }
 
         sleep(2);
 
-        vector<ApplicationInfo> apps = secMgr->GetApplications();
+        vector<Application> apps = secMgr->GetApplications();
         bool breakhit = false;
-        for (ApplicationInfo app : apps) {
+        for (Application app : apps) {
             if (app.runningState == STATE_RUNNING && app.claimState ==
-                ajn::PermissionConfigurator::STATE_CLAIMABLE) {
+                ajn::PermissionConfigurator::CLAIMABLE) {
                 cout << "Trying to claim " << app.busName.c_str() << endl;
                 IdentityInfo idInfo;
-                idInfo.guid = app.peerID;
+                idInfo.guid = GUID128(app.aki);
                 idInfo.name = "MyTestName";
                 if (secMgr->StoreIdentity(idInfo) != ER_OK) {
                     cerr << "Could not store identity " << endl;
@@ -358,11 +358,11 @@ static int be_secmgr(size_t peers)
         }
 
         cout << "Waiting for peers to become claimed " << endl;
-        if (tal.WaitFor(STATE_RUNNING, ajn::PermissionConfigurator::STATE_CLAIMED, peers) == false) {
+        if (tal.WaitFor(STATE_RUNNING, ajn::PermissionConfigurator::CLAIMED, peers) == false) {
             break;
         }
 
-        if (secMgr->GetApplications(ajn::PermissionConfigurator::STATE_CLAIMED).size() != peers) {
+        if (secMgr->GetApplications(ajn::PermissionConfigurator::CLAIMED).size() != peers) {
             cerr << "Expected: " << peers << " claimed applications but only have " <<
                 secMgr->GetApplications().size() << endl;
             break;
@@ -381,9 +381,9 @@ static int be_secmgr(size_t peers)
         }
 
         apps = secMgr->GetApplications();
-        for (ApplicationInfo app : apps) {
+        for (Application app : apps) {
             if (app.runningState == STATE_RUNNING && app.claimState ==
-                ajn::PermissionConfigurator::STATE_CLAIMED) {
+                ajn::PermissionConfigurator::CLAIMED) {
                 cout << "Trying to install membership certificate on " << app.busName.c_str() << endl;
                 if (secMgr->InstallMembership(app, guild) != ER_OK) {
                     cerr << "Could not install membership certificate on " << app.busName.c_str() << endl;

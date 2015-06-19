@@ -17,6 +17,7 @@
 #include <qcc/Util.h>
 #include <qcc/Environ.h>
 #include <stdlib.h>
+#include <qcc/Thread.h>
 
 using namespace ajn::securitymgr;
 using namespace std;
@@ -27,23 +28,22 @@ using namespace std;
 namespace secmgrcoretest_unit_testutil {
 TestApplicationListener::TestApplicationListener(qcc::Condition& _sem,
                                                  qcc::Mutex& _lock) :
-    event(false), sem(_sem), lock(_lock)
+    sem(_sem), lock(_lock)
 {
 }
 
-void TestApplicationListener::OnApplicationStateChange(const ApplicationInfo* old,
-                                                       const ApplicationInfo* updated)
+void TestApplicationListener::OnApplicationStateChange(const OnlineApplication* old,
+                                                       const OnlineApplication* updated)
 {
-    const ApplicationInfo* info = updated ? updated : old;
+    const OnlineApplication* info = updated ? updated : old;
     ApplicationListener::PrintStateChangeEvent(old, updated);
     lock.Lock();
-    _lastAppInfo = *info;
-    event = true;
+    events.push_back(*info);
     sem.Broadcast();
     lock.Unlock();
 }
 
-BasicTest::BasicTest()
+BasicTest::BasicTest() : storage(nullptr), ca(nullptr)
 {
     secMgr = NULL;
     tal = NULL;
@@ -64,7 +64,7 @@ void BasicTest::SetUp()
     fname.append("/.alljoyn_keystore/stub.ks");
     remove(fname.c_str());
 
-    SecurityManagerFactory& secFac = SecurityManagerFactory::GetInstance();
+    SecurityAgentFactory& secFac = SecurityAgentFactory::GetInstance();
     SQLStorageFactory& storageFac = SQLStorageFactory::GetInstance();
 
     ba = new BusAttachment("test", true);
@@ -76,14 +76,16 @@ void BasicTest::SetUp()
 
     /* Passing NULL into WhoImplements will listen for all About announcements */
 
-    if (ER_OK == ba->WhoImplements(NULL)) {
-        printf("WhoImplements NULL called.\n");
-    } else {
+    if (ER_OK != ba->WhoImplements(NULL)) {
         printf("WhoImplements NULL failed.\n");
     }
 
-    storage = storageFac.GetStorage();
-    secMgr = secFac.GetSecurityManager(storage, ba);
+    ASSERT_EQ(ER_OK, storageFac.GetStorages("test", ca, storage));
+    SecurityAgentIdentityInfo securityAgentIdendtityInfo;
+    securityAgentIdendtityInfo.name = "UnitTestAgent";
+    securityAgentIdendtityInfo.version = "1.0";
+    securityAgentIdendtityInfo.vendor = "Nameless Vendor";
+    secMgr = secFac.GetSecurityAgent(securityAgentIdendtityInfo, ca, ba);
     ASSERT_TRUE(secMgr != NULL);
 
     secMgr->SetManifestListener(&aa);
@@ -95,11 +97,15 @@ void BasicTest::SetUp()
 void BasicTest::UpdateLastAppInfo()
 {
     lock.Lock();
-    lastAppInfo = tal->_lastAppInfo;
+    if (tal->events.size()) {
+        vector<OnlineApplication>::iterator it = tal->events.begin();
+        lastAppInfo = *it;
+        tal->events.erase(it);
+    }
     lock.Unlock();
 }
 
-bool BasicTest::WaitForState(ajn::PermissionConfigurator::ClaimableState newState,
+bool BasicTest::WaitForState(ajn::PermissionConfigurator::ApplicationState newState,
                              ajn::securitymgr::ApplicationRunningState newRunningState, const int updatesPending)
 {
     lock.Lock();
@@ -107,38 +113,49 @@ bool BasicTest::WaitForState(ajn::PermissionConfigurator::ClaimableState newStat
     //Prior to entering this function, the test should have taken an action which leads to one or more events.
     //These events are handled in a separate thread.
     do {
-        if (tal->event) { //if event is in the queue, we will return immediately
-            tal->event = false;
+        if (tal->events.size()) { //if event is in the queue, we will return immediately
             UpdateLastAppInfo(); //update latest value.
             printf("WaitForState: Checking event ... ");
-            if (lastAppInfo.claimState == newState && newRunningState == lastAppInfo.runningState &&
-                lastAppInfo.appName.size() != 0 &&
+            if (lastAppInfo.claimState == newState && MatchesRunningState(lastAppInfo, newRunningState) &&
                 ((updatesPending == -1 ? 1 : ((bool)updatesPending == lastAppInfo.updatesPending)))) {
                 printf("ok\n");
                 lock.Unlock();
                 return true;
             }
+            printf("not ok, waiting/checking for next event\n");
+        } else {
+            QStatus status = sem.TimedWait(lock, 10000);
+            if (ER_OK != status) {
+                printf("timeout- failing test - %i\n", status);
+                break;
+            }
+            assert(tal->events.size()); // assume TimedWait returns != ER_OK in case of timeout
         }
-        QStatus status = sem.TimedWait(lock, 10000);
-        if (ER_OK != status) {
-            printf("timeout- failing test - %i\n", status);
-            break;
-        }
-        assert(tal->event); // assume TimedWait returns != ER_OK in case of timeout
-        printf("not ok, waiting for next event\n");
     } while (true);
     printf("WaitForState failed.\n");
     printf("\tClaimableState: expected = %s, got %s\n", ToString(newState),
            ToString(lastAppInfo.claimState));
-    printf("\tRunningState: expected = %s, got %s\n", ToString(
-               newRunningState), ToString(lastAppInfo.runningState));
-    printf("\tApplicationName = '%s' (size = %lu)\n", lastAppInfo.appName.c_str(), lastAppInfo.appName.size());
+    printf("\tRunningState: expected = %s\n", ToString(
+               newRunningState));
     if (updatesPending != -1) {
         printf("\tUpdatesPending : expected = %s, got %s\n", (updatesPending ? "True" : "False"),
                (lastAppInfo.updatesPending ? "True" : "False"));
     }
 
     lock.Unlock();
+    return false;
+}
+
+bool BasicTest::MatchesRunningState(const OnlineApplication& app,
+                                    ajn::securitymgr::ApplicationRunningState runningState)
+{
+    if (runningState == ajn::securitymgr::ApplicationRunningState::STATE_RUNNING && !app.busName.empty()) {
+        return true;
+    }
+
+    if (runningState == ajn::securitymgr::ApplicationRunningState::STATE_NOT_RUNNING  && app.busName.empty()) {
+        return true;
+    }
     return false;
 }
 
@@ -150,17 +167,14 @@ void BasicTest::TearDown()
         tal = NULL;
     }
     delete secMgr;
+    secMgr = NULL;
 
     ba->UnregisterAboutListener(testAboutListener);
 
     delete ba;
-    storage->Reset();
-    delete storage;
-    storage = NULL;
     ba = NULL;
-    secMgr = NULL;
-    tal = NULL;
     delete stub;
     stub = NULL;
+    storage->Reset();
 }
 }

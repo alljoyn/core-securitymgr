@@ -121,7 +121,7 @@ int main(int arg, char** argv)
                     for (std::map<GUID128, qcc::String>::const_iterator it = memberships.begin();
                          it != memberships.end();
                          ++it) {
-                        printf("Guild ID = '%s'; Certificate\n %s", it->first.ToString().c_str(), it->second.c_str());
+                        printf("Group ID = '%s'; Certificate\n %s", it->first.ToString().c_str(), it->second.c_str());
                     }
                 } else {
                     printf("There are currently no Membership certificates installed \n");

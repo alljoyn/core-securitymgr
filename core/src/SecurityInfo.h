@@ -14,32 +14,23 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef SECURITYINFO_H_
-#define SECURITYINFO_H_
+#ifndef ALLJOYN_SECMGR_SECURITYINFO_H_
+#define ALLJOYN_SECMGR_SECURITYINFO_H_
 
 #include <vector>
 #include <qcc/String.h>
 #include <qcc/GUID.h>
-#include <Common.h>
-#include <alljoyn/securitymgr/ApplicationInfo.h>
 
-#define QCC_MODULE "SEC_MGR"
+#include <alljoyn/securitymgr/Application.h>
 
 namespace ajn {
 namespace securitymgr {
-/*
- * \brief Represents the data of a remote NotifyConfig signal.
- */
 struct SecurityInfo {
   public:
     qcc::String busName;
     qcc::ECCPublicKey publicKey;
-    ajn::PermissionConfigurator::ClaimableState claimState;
-    uint32_t policySerialNum;
-    ApplicationRunningState runningState;
-    std::vector<qcc::ECCPublicKey> rootsOfTrust;
+    PermissionConfigurator::ApplicationState applicationState;
 };
 }
 }
-#undef QCC_MODULE
-#endif /* SECURITYINFO_H_ */
+#endif /* ALLJOYN_SECMGR_SECURITYINFO_H_ */

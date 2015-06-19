@@ -14,14 +14,12 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef IDENTITYINFO_H_
-#define IDENTITYINFO_H_
+#ifndef ALLJOYN_SECMGR_IDENTITYINFO_H_
+#define ALLJOYN_SECMGR_IDENTITYINFO_H_
 
 #include <qcc/CryptoECC.h>
 #include <qcc/String.h>
 #include <qcc/GUID.h>
-
-#define QCC_MODULE "SEC_MGR"
 
 namespace ajn {
 namespace securitymgr {
@@ -32,18 +30,18 @@ namespace securitymgr {
  */
 struct IdentityInfo {
     /**
-     * \brief The authority of this identity. It is the public key of the
+     * \brief The authority of this identity. It is the public key info of the
      * security manager that created this identity. It is part of the composite
      * key of this object.
      */
-    qcc::ECCPublicKey authority;
+    qcc::KeyInfoNISTP256 authority;
     /**
      * \brief The guid of this identity. It is part of the composite key of this
      * object.
      */
     qcc::GUID128 guid;
     /**
-     * \brief The name of this guild.
+     * \brief The name of this group.
      */
     qcc::String name;
 
@@ -65,5 +63,4 @@ struct IdentityInfo {
 };
 }
 }
-#undef QCC_MODULE
-#endif /* IDENTITYINFO_H_ */
+#endif /* ALLJOYN_SECMGR_IDENTITYINFO_H_ */

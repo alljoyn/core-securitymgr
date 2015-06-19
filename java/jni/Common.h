@@ -24,7 +24,7 @@
 #define NULLPOINTEREXCEPTION_CLASS "java/lang/NullPointerException"
 #define ILLEGALARGUMENTEXCEPTION_CLASS "java/lang/IllegalArgumentException"
 #define STRING_CLASS "Ljava/lang/String;"
-#define APPLICATIONINFO_CLASS "Lorg/alljoyn/securitymgr/ApplicationInfo;"
+#define APPLICATIONINFO_CLASS "Lorg/alljoyn/securitymgr/Application;"
 #define RULE_CLASS "Lorg/alljoyn/securitymgr/access/Rule;"
 #define MEMBER_CLASS "Lorg/alljoyn/securitymgr/access/Member;"
 #define OUTOFMEMORYERROR_CLASS "java/lang/OutOfMemoryError"
@@ -53,8 +53,8 @@ class Common :
                                       const PermissionPolicy::Rule::Member* members,
                                       size_t membersSize);
 
-    void OnApplicationStateChange(const ApplicationInfo* oldAppInfo,
-                                  const ApplicationInfo* newAppInfo);
+    void OnApplicationStateChange(const OnlineApplication* oldApp,
+                                  const OnlineApplication* newApp);
 
   public:
     Common(JNIEnv* env,
@@ -62,15 +62,15 @@ class Common :
            SecurityManager* mngr);
     ~Common();
 
-    bool ApproveManifest(const ApplicationInfo& appInfo,
+    bool ApproveManifest(const Application& app,
                          const PermissionPolicy::Rule* manifestRules,
                          const size_t manifestRulesCount);
 
     static Storage* storage;
     static JavaVM* jvm;
 
-    static jclass applicationInfoClass;
-    static jmethodID appInfoConstructorMID;
+    static jclass appClass;
+    static jmethodID appConstructorMID;
     static jfieldID infoAppNameFID;
     static jfieldID infoDevNameFID;
     static jfieldID infoFriendlyNameFID;
@@ -90,7 +90,7 @@ class Common :
 
     static void initCommon(JNIEnv* env,
                            jclass secMgrClass,
-                           jclass appInfoClass,
+                           jclass appClass,
                            jclass ruleClass,
                            jclass memberClass);
 
@@ -103,11 +103,11 @@ class Common :
                       const char* name,
                       const char* msg);
 
-    static jobject ToApplicationInfoObject(JNIEnv* env,
-                                           const ApplicationInfo& info);
+    static jobject ToApplicationObject(JNIEnv* env,
+                                       const Application& info);
 
-    static ApplicationInfo ToNativeInfo(JNIEnv* env,
-                                        jobject appInfo);
+    static Application ToNativeInfo(JNIEnv* env,
+                                    jobject app);
 
     static SecurityManager* GetSecurityManager(JNIEnv* env,
                                                jobject securityMgr);
@@ -136,7 +136,7 @@ class Common :
     SecurityManager* GetSecurityManager(JNIEnv* env);
 
     bool CallManifestCallback(JNIEnv* env,
-                              const ApplicationInfo& appInfo,
+                              const Application& app,
                               jobject manifest);
 };
 

@@ -14,22 +14,22 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
-#ifndef APPLICATIONUPDATER_H_
-#define APPLICATIONUPDATER_H_
+#ifndef ALLJOYN_SECMGR_APPLICATIONUPDATER_H_
+#define ALLJOYN_SECMGR_APPLICATIONUPDATER_H_
 
 #include <qcc/GUID.h>
 
 #include <alljoyn/BusAttachment.h>
 #include <alljoyn/Status.h>
 
-#include <X509CertificateGenerator.h>
-#include <alljoyn/securitymgr/Storage.h>
-#include <alljoyn/securitymgr/ApplicationInfo.h>
+#include <alljoyn/securitymgr/CaStorage.h>
+#include <alljoyn/securitymgr/Application.h>
 
 #include "RemoteApplicationManager.h"
 #include "SecurityInfoListener.h"
 #include "TaskQueue.h"
-#include "SecurityManagerImpl.h"
+#include "SecurityAgentImpl.h"
+#include <memory>
 
 namespace ajn {
 namespace securitymgr {
@@ -53,65 +53,72 @@ class SecurityEvent {
 };
 
 class ApplicationUpdater :
-    public SecurityInfoListener {
+    public SecurityInfoListener,
+    public StorageListener {
   public:
     ApplicationUpdater(BusAttachment* ba, // no ownership
-                       Storage* s, // no ownership
-                       RemoteApplicationManager* ram, // no ownership
-                       SecurityManagerImpl* smi, // no ownership
-                       ECCPublicKey pubkey) :
-        busAttachment(ba), storage(s), applicationManager(ram),
-        securityManagerImpl(smi), securityManagerPubkey(pubkey),
+                       const shared_ptr<CaStorage>& s,
+                       shared_ptr<RemoteApplicationManager>& ram,
+                       shared_ptr<ApplicationMonitor>& _monitor,
+                       SecurityAgentImpl* smi // no ownership
+                       ) :
+        busAttachment(ba), storage(s), applicationManager(ram), monitor(_monitor),
+        securityAgentImpl(smi),
         queue(TaskQueue<SecurityEvent*, ApplicationUpdater>(this))
     {
-        CertificateX509::GenerateAuthorityKeyId(&pubkey, securityManagerKeyId);
-        certificateGenerator = new X509CertificateGenerator(securityManagerKeyId, ba);
+        monitor->RegisterSecurityInfoListener(this);
+        storage->RegisterStorageListener(this);
     }
 
     ~ApplicationUpdater()
     {
+        storage->UnRegisterStorageListener(this);
+        monitor->UnregisterSecurityInfoListener(this);
         queue.Stop();
     }
 
-    QStatus UpdateApplication(const ApplicationInfo& appInfo);
+    QStatus UpdateApplication(const OnlineApplication& app);
 
     QStatus UpdateApplication(const SecurityInfo& secInfo);
 
     void HandleTask(SecurityEvent* event);
 
   private:
-    QStatus UpdateApplication(const ApplicationInfo& appInfo,
+    QStatus UpdateApplication(const OnlineApplication& app,
                               const SecurityInfo& secInfo);
 
-    QStatus ResetApplication(const ApplicationInfo& appInfo,
+    QStatus ResetApplication(const OnlineApplication& app,
                              const SecurityInfo& secInfo);
 
-    QStatus UpdatePolicy(const ApplicationInfo& appInfo,
-                         const SecurityInfo& secInfo,
-                         const ManagedApplicationInfo& mgdAppInfo);
+    QStatus UpdatePolicy(const OnlineApplication& app,
+                         const SecurityInfo& secInfo);
 
-    QStatus UpdateMembershipCertificates(const ApplicationInfo& appInfo,
+    QStatus UpdateMembershipCertificates(const OnlineApplication& app,
                                          const SecurityInfo& secInfo,
-                                         const ManagedApplicationInfo& mgdAppInfo);
+                                         const Application& mgdAppInfo);
 
-    QStatus UpdateIdentityCert(const ApplicationInfo& appInfo,
-                               const SecurityInfo& secInfo,
-                               const ManagedApplicationInfo& mgdAppInfo);
+    QStatus UpdateIdentityCert(const OnlineApplication& app);
 
     virtual void OnSecurityStateChange(const SecurityInfo* oldSecInfo,
                                        const SecurityInfo* newSecInfo);
 
+    virtual void OnPendingChanges(std::vector<Application>& apps);
+
+    virtual void OnPendingChangesCompleted(std::vector<Application>& apps)
+    {
+        QCC_UNUSED(apps);
+    }
+
   private:
     ajn::BusAttachment* busAttachment;
-    Storage* storage;
-    RemoteApplicationManager* applicationManager;
-    SecurityManagerImpl* securityManagerImpl;
-    qcc::String securityManagerKeyId;
-    ECCPublicKey securityManagerPubkey;
+    shared_ptr<CaStorage> storage;
+    shared_ptr<RemoteApplicationManager> applicationManager;
+    shared_ptr<ApplicationMonitor> monitor;
+    SecurityAgentImpl* securityAgentImpl;
+
     TaskQueue<SecurityEvent*, ApplicationUpdater> queue;
-    X509CertificateGenerator* certificateGenerator;
 };
 }
 }
 
-#endif /* APPLICATIONUPDATER_H_ */
+#endif /* ALLJOYN_SECMGR_APPLICATIONUPDATER_H_ */
