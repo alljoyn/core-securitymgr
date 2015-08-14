@@ -49,7 +49,7 @@ if ! nm "${TEST_ROOT}/agent/unit_test/secmgrctest" | grep BundledRouter &> /dev/
     fi
 fi
 
-LIB_PATH="${PLATFORM_ROOT}/dist/security/lib:${PLATFORM_ROOT}/dist/cpp/lib:${PLATFORM_ROOT}/dist/services_common/lib"
+LIB_PATH="${PLATFORM_ROOT}/dist/security/lib:${PLATFORM_ROOT}/dist/cpp/lib"
 
 export LD_LIBRARY_PATH="${LIB_PATH}"
 
