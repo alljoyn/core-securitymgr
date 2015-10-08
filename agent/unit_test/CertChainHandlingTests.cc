@@ -53,7 +53,7 @@ class CertChainAgentStorageWrapper :
                 char serial[6];
                 memset(serial, i + 100, 5);
                 serial[5] = 0;
-                CreateMembershipChain(chain, serial);
+                CreateMembershipChain(chain, serial, agentKey);
                 adminGroupMemberships.push_back(chain);
             }
             agentMembershipCertificates = adminGroupMemberships;
@@ -107,30 +107,25 @@ class CertChainAgentStorageWrapper :
   private:
     CertChainAgentStorageWrapper& operator=(const CertChainAgentStorageWrapper);
 
-    void CreateMembershipChain(MembershipCertificateChain& chain, const char* serial)
+    void CreateMembershipChain(MembershipCertificateChain& chain, const char* serial, const KeyInfoNISTP256& agentKey)
     {
         AJNCa tmpCa;
         tmpCa.Init("tmpCA");
         ECCPrivateKey privateKey;
         ECCPublicKey rootKey;
-        Crypto_ECC ecc;
-        ecc.GenerateDHKeyPair();
         tmpCa.GetDSAPrivateKey(privateKey);
         tmpCa.GetDSAPublicKey(rootKey);
         MembershipCertificate cert;
         cert.SetCA(false);
         cert.SetSerial((const uint8_t*)serial, strlen(serial));
         CertificateUtil::SetValityPeriod(36000, cert);
-        cert.SetSubjectPublicKey(ecc.GetDHPublicKey());
+        cert.SetSubjectPublicKey(agentKey.GetPublicKey());
         GUID128 group(serial[0]);
         cert.SetGuild(group);
         qcc::String rootkAki;
-        qcc::String aki;
-
-        CertificateX509::GenerateAuthorityKeyId(ecc.GetDHPublicKey(), aki);
         CertificateX509::GenerateAuthorityKeyId(&rootKey, rootkAki);
         cert.SetIssuerCN((const uint8_t*)rootkAki.data(), rootkAki.size());
-        cert.SetSubjectCN((const uint8_t*)rootkAki.data(), rootkAki.size());
+        cert.SetSubjectCN(agentKey.GetKeyId(), agentKey.GetKeyIdLen());
         EXPECT_EQ(ER_OK, cert.SignAndGenerateAuthorityKeyId(&privateKey, &rootKey));
         chain.push_back(cert);
 
@@ -203,7 +198,8 @@ class CertChainHandlingTests :
     {
         Manifest ignored;
         IdentityCertificateChain expectedChain;
-        ASSERT_EQ(ER_OK, wrappedCa->GetIdentityCertificatesAndManifest(lastAppInfo, expectedChain, ignored))
+
+        ASSERT_EQ(ER_OK, wrappedCa->GetIdentityCertificatesAndManifest(testAppInfo, expectedChain, ignored))
             << "failure from " << function << "@" << line;
         ASSERT_EQ(expectedChain.size(), chain.size()) << "failure from " << function << "@" << line;
 
@@ -225,11 +221,11 @@ class CertChainHandlingTests :
     void CheckMembershipSummaries(bool& failure, const char* function, int line)
     {
         vector<MembershipSummary> summaries;
-        ASSERT_EQ(ER_OK, GetMembershipSummaries(lastAppInfo, summaries))
+        ASSERT_EQ(ER_OK, GetMembershipSummaries(testAppInfo, summaries))
             << "failure from " << function << "@" << line;
         vector<MembershipCertificateChain> chains;
         ASSERT_EQ(ER_OK,
-                  wrappedCa->GetMembershipCertificates(lastAppInfo,
+                  wrappedCa->GetMembershipCertificates(testAppInfo,
                                                        chains)) << "failure from " << function << "@" << line;
         ASSERT_EQ(chains.size(), summaries.size()) << "failure from " << function << "@" << line;
 
@@ -267,18 +263,18 @@ class CertChainHandlingTests :
 
 TEST_F(CertChainHandlingTests, ClaimChain) {
     IdentityCertificateChain singleIdCertChain;
-    ASSERT_EQ(ER_OK, GetIdentity(lastAppInfo, singleIdCertChain));
+    ASSERT_EQ(ER_OK, GetIdentity(testAppInfo, singleIdCertChain));
     CHECK_IDENTITY_CHAIN(singleIdCertChain);
     //Reset the application as it is already claimed.
-    ASSERT_EQ(ER_OK, storage->ResetApplication(lastAppInfo));
+    ASSERT_EQ(ER_OK, storage->ResetApplication(testAppInfo));
     ASSERT_TRUE(WaitForState(PermissionConfigurator::CLAIMABLE));
 
     wrappedCa->addIdRootCert = true;
 
-    ASSERT_EQ(ER_OK, secMgr->Claim(lastAppInfo, idInfo));
+    ASSERT_EQ(ER_OK, secMgr->Claim(testAppInfo, idInfo));
     ASSERT_TRUE(WaitForState(PermissionConfigurator::CLAIMED, SYNC_OK));
     IdentityCertificateChain idCertChain;
-    ASSERT_EQ(ER_OK, GetIdentity(lastAppInfo, idCertChain));
+    ASSERT_EQ(ER_OK, GetIdentity(testAppInfo, idCertChain));
     ASSERT_EQ((size_t)2, idCertChain.size());
     CHECK_IDENTITY_CHAIN(idCertChain);
 }
@@ -294,10 +290,10 @@ TEST_F(CertChainHandlingTests, ClaimChain) {
 TEST_F(CertChainHandlingTests, InstallMembershipChain) {
     wrappedCa->addMembershipRootCert = true;
     storage->StoreGroup(groupInfo);
-    ASSERT_EQ(ER_OK, storage->InstallMembership(lastAppInfo, groupInfo));
+    ASSERT_EQ(ER_OK, storage->InstallMembership(testAppInfo, groupInfo));
     ASSERT_TRUE(WaitForUpdatesCompleted());
     vector<MembershipSummary> summaries;
-    ASSERT_EQ(ER_OK, GetMembershipSummaries(lastAppInfo, summaries));
+    ASSERT_EQ(ER_OK, GetMembershipSummaries(testAppInfo, summaries));
     ASSERT_EQ((size_t)1, summaries.size());
     CHECK_MEMBERSHIP_SUMMARIES();
     GroupInfo group2;
@@ -307,19 +303,19 @@ TEST_F(CertChainHandlingTests, InstallMembershipChain) {
     storage->StoreGroup(group2);
     storage->StoreGroup(group3);
 
-    ASSERT_EQ(ER_OK, storage->InstallMembership(lastAppInfo, group2));
+    ASSERT_EQ(ER_OK, storage->InstallMembership(testAppInfo, group2));
     ASSERT_TRUE(WaitForUpdatesCompleted());
     CHECK_MEMBERSHIP_SUMMARIES();
-    ASSERT_EQ(ER_OK, storage->InstallMembership(lastAppInfo, group3));
+    ASSERT_EQ(ER_OK, storage->InstallMembership(testAppInfo, group3));
     ASSERT_TRUE(WaitForUpdatesCompleted());
     CHECK_MEMBERSHIP_SUMMARIES();
-    ASSERT_EQ(ER_OK, storage->RemoveMembership(lastAppInfo, group3));
+    ASSERT_EQ(ER_OK, storage->RemoveMembership(testAppInfo, group3));
     ASSERT_TRUE(WaitForUpdatesCompleted());
     CHECK_MEMBERSHIP_SUMMARIES();
-    ASSERT_EQ(ER_OK, storage->RemoveMembership(lastAppInfo, groupInfo));
+    ASSERT_EQ(ER_OK, storage->RemoveMembership(testAppInfo, groupInfo));
     ASSERT_TRUE(WaitForUpdatesCompleted());
     CHECK_MEMBERSHIP_SUMMARIES();
-    ASSERT_EQ(ER_OK, storage->RemoveMembership(lastAppInfo, group2));
+    ASSERT_EQ(ER_OK, storage->RemoveMembership(testAppInfo, group2));
     ASSERT_TRUE(WaitForUpdatesCompleted());
     CHECK_MEMBERSHIP_SUMMARIES();
 }
@@ -333,14 +329,14 @@ TEST_F(CertChainHandlingTests, InstallMembershipChain) {
  **/
 TEST_F(CertChainHandlingTests, UpdateIdentityChains) {
     IdentityCertificateChain singleIdCertChain;
-    ASSERT_EQ(ER_OK, GetIdentity(lastAppInfo, singleIdCertChain));
+    ASSERT_EQ(ER_OK, GetIdentity(testAppInfo, singleIdCertChain));
     CHECK_IDENTITY_CHAIN(singleIdCertChain);
     wrappedCa->addIdRootCert = true;
 
-    ASSERT_EQ(ER_OK, storage->UpdateIdentity(lastAppInfo, idInfo, aa.lastManifest));
+    ASSERT_EQ(ER_OK, storage->UpdateIdentity(testAppInfo, idInfo, aa.lastManifest));
     ASSERT_TRUE(WaitForUpdatesCompleted());
     IdentityCertificateChain idCertChain;
-    ASSERT_EQ(ER_OK, GetIdentity(lastAppInfo, idCertChain));
+    ASSERT_EQ(ER_OK, GetIdentity(testAppInfo, idCertChain));
     ASSERT_EQ((size_t)2, idCertChain.size());
     CHECK_IDENTITY_CHAIN(idCertChain);
 }
@@ -357,6 +353,8 @@ TEST_F(CertChainHandlingTests, RegisterAgent) {
     agent.busName = ba->GetUniqueName().c_str();
 
     IdentityCertificateChain idChain;
+    DefaultECDHEAuthListener dal;
+    ba->EnablePeerSecurity(ECDHE_KEYX, &dal); //make sure our bus DSA enabled.
     ASSERT_EQ(ER_OK, GetIdentity(agent, idChain));
     ASSERT_EQ(wrappedCa->agentIdChain.size(), idChain.size());
     ASSERT_EQ((size_t)2, idChain.size()); //extra check to make sure the test passed the full chain.
@@ -388,5 +386,6 @@ TEST_F(CertChainHandlingTests, RegisterAgent) {
         ASSERT_TRUE(found) << "loop " << i << ": serialNr = " << serial;
     }
     ASSERT_EQ((size_t)0, summaries.size());
+    ba->EnablePeerSecurity("", nullptr);
 }
 }
