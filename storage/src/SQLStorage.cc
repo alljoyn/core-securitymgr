@@ -49,6 +49,7 @@ QStatus SQLStorage::StoreApplication(const Application& app, const bool update, 
         Application tmp = app;
         if (ER_OK != GetManagedApplication(tmp)) {
             QCC_LogError(funcStatus, ("Trying to update a non-existing application !"));
+            storageMutex.Unlock(__FILE__, __LINE__);
             return funcStatus;
         }
 
