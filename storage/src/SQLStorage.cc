@@ -1144,7 +1144,14 @@ QStatus SQLStorage::GetIdentities(vector<IdentityInfo>& idInfos) const
 void SQLStorage::Reset()
 {
     storageMutex.Lock(__FILE__, __LINE__);
-    sqlite3_close(nativeStorageDB);
+
+    if (nativeStorageDB != nullptr) {
+        if (sqlite3_close(nativeStorageDB) != SQLITE_OK) {
+            LOGSQLERROR(ER_FAIL);
+        }
+        nativeStorageDB = nullptr;
+    }
+
     remove(GetStoragePath().c_str());
     storageMutex.Unlock(__FILE__, __LINE__);
 }
@@ -1152,10 +1159,15 @@ void SQLStorage::Reset()
 SQLStorage::~SQLStorage()
 {
     storageMutex.Lock(__FILE__, __LINE__);
-    int sqlRetCode;
-    if ((sqlRetCode = sqlite3_close(nativeStorageDB)) != SQLITE_OK) { //TODO :: change to sqlite3_close_v2 once Jenkins machines allow for it
-        LOGSQLERROR(ER_FAIL);
+
+    //TODO :: change to sqlite3_close_v2 once Jenkins machines allow for it
+    if (nativeStorageDB != nullptr) {
+        if (sqlite3_close(nativeStorageDB) != SQLITE_OK) {
+            LOGSQLERROR(ER_FAIL);
+        }
+        nativeStorageDB = nullptr;
     }
+
     storageMutex.Unlock(__FILE__, __LINE__);
 }
 
@@ -1354,7 +1366,9 @@ QStatus SQLStorage::Init()
         if (SQLITE_OK != sqlRetCode) {
             funcStatus = ER_FAIL;
             LOGSQLERROR(funcStatus);
-            sqlite3_close(nativeStorageDB);
+            if (nativeStorageDB != nullptr) {
+                sqlite3_close(nativeStorageDB);
+            }
             break;
         }
 

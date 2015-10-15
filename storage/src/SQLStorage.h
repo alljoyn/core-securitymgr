@@ -125,7 +125,7 @@ class SQLStorage {
   public:
 
     SQLStorage(const SQLStorageConfig& _storageConfig) :
-        status(ER_OK), storageConfig(_storageConfig)
+        status(ER_OK), nativeStorageDB(nullptr), storageConfig(_storageConfig)
     {
         status = Init();
     }
