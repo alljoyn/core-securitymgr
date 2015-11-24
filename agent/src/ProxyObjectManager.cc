@@ -98,7 +98,7 @@ QStatus ProxyObjectManager::ReleaseProxyObject(SecurityApplicationProxy* remoteO
 ProxyObjectManager::ManagedProxyObject::~ManagedProxyObject()
 {
     if (remoteObj != nullptr) {
-        assert(proxyObjectManager);
+        QCC_ASSERT(proxyObjectManager);
         proxyObjectManager->ReleaseProxyObject(remoteObj, resetAuthListener);
     }
 }
